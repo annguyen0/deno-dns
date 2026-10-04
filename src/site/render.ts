@@ -124,7 +124,7 @@ const indexBody = [
 
 Deno.writeTextFileSync(
   `${outDir}/index.html`,
-  page("deno-dns — documentation", indexBody),
+  page("documentation", indexBody),
 );
 Deno.writeTextFileSync(`${outDir}/.nojekyll`, "");
 
