@@ -3,7 +3,8 @@
   "specifiers": {
     "jsr:@std/assert@^1.0.10": "1.0.19",
     "jsr:@std/internal@^1.0.12": "1.0.14",
-    "npm:dns-packet@^5.6.1": "5.6.1"
+    "npm:dns-packet@^5.6.1": "5.6.1",
+    "npm:marked@*": "18.0.14"
   },
   "jsr": {
     "@std/assert@1.0.19": {
@@ -25,12 +26,17 @@
       "dependencies": [
         "@leichtgewicht/ip-codec"
       ]
+    },
+    "marked@18.0.14": {
+      "integrity": "sha512-mBHK6FBHuBAlhgRe88w9F0O1AbwwXJUcQibUbC/QcdTbVGAD7aWza+xt3N6oT/jCZx3/OMeS+8rnuiHZcQ9s7A==",
+      "bin": true
     }
   },
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@^1.0.10",
-      "npm:dns-packet@^5.6.1"
+      "npm:dns-packet@^5.6.1",
+      "npm:marked@*"
     ]
   }
 }

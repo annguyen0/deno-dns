@@ -7,6 +7,7 @@
     "fmt": "deno fmt",
     "test": "deno test",
     "build": "echo 'No build step — Deno native'",
+    "build-site": "deno run --allow-read --allow-write src/site/render.ts",
     "migrate-kv": "deno run --allow-read --allow-write --allow-env src/kv/migration.ts",
     "bench-hot-path": "deno run --allow-read --allow-env src/bench/hot_path.ts"
   },
@@ -15,16 +16,19 @@
   ],
   "imports": {
     "dns-packet": "npm:dns-packet@^5.6.1",
-    "@std/assert": "jsr:@std/assert@^1.0.10"
+    "@std/assert": "jsr:@std/assert@^1.0.10",
+    "marked": "npm:marked"
   },
   "lint": {
     "exclude": [
-      ".kilo/"
+      ".kilo/",
+      "_site/"
     ]
   },
   "fmt": {
     "exclude": [
-      ".kilo/"
+      ".kilo/",
+      "_site/"
     ]
   }
 }
