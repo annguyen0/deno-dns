@@ -31,8 +31,14 @@ bản theo [Semantic Versioning](https://semver.org/lang/vi/).
 - **Test suite 47 test** qua 7 module (`*_test.ts` cạnh nguồn).
 - **CI/CD GitHub Actions** `.github/workflows/deno.yml`: lint · fmt · check ·
   test trên mỗi PR/push; quét bảo mật khóa phụ thuộc; deploy tài liệu lên GitHub
-  Pages; PR sửa docs nhận **comment preview** (artifact `docs-preview-pr-<n>`,
-  plan §6.2).
+  Pages.
+- **Preview cho PR** (job `preview`, plan §6.2): chờ commit status `deploy/*`
+  của Deno Deploy rồi đăng **comment sticky** trên PR — trạng thái build + link
+  console, kèm **Preview URL** `https://<domain>.deno.dev` khi có secret
+  `DENO_DEPLOY_TOKEN` (không có token: vẫn xanh, chỉ thiếu dòng URL). PR sửa
+  `docs/`, `README.md` hoặc `CHANGELOG.md` được upload artifact
+  `docs-preview-pr-<n>` (giữ 14 ngày). Fork PR không nhận secret → comment chỉ
+  hiện phần docs.
 - Tài liệu: `docs/CONTRIBUTING.md`, `docs/CODE_OF_CONDUCT.md`, cấu trúc lại
   `docs/ARCHITECTURE.md` §1–§11 (tiếng Việt, C4 + ADR-1…ADR-7).
 

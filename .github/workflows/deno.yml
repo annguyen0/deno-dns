@@ -112,18 +112,23 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  docs-preview:
-    # Preview tai lieu cho PR (plan §6.2 "Deploy preview for PR branch"):
-    # upload artifact tu branch cua PR + sticky comment tren PR tro toi artifact do.
-    # Khong can build — Pages cung publish Markdown (docs/*.md, README, CHANGELOG).
-    name: Docs Preview (PR comment)
+  preview:
+    # Deploy preview cho PR (plan §6.2 "Deploy preview for PR branch"):
+    # 1) Cho + doc commit status `deploy/<owner>/<repo>` cua Deno Deploy → link build/Preview.
+    # 2) Upload artifact docs tu branch cua PR (Pages cung publish Markdown, khong can render).
+    # 3) Sticky comment tren PR: trang thai deploy + file docs thay doi + artifact.
+    # Preview URL truc tiep (https://<domain>.deno.dev) can secret DENO_DEPLOY_TOKEN;
+    # khong co token thi comment chi hien trang thai build + link console (khong fail job).
+    # PR tu fork: khong co secret/Deno Deploy build → bo qua phan deploy, van comment docs.
+    name: Preview (Deno Deploy + docs)
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write
     concurrency:
-      group: docs-preview-pr-${{ github.event.pull_request.number }}
+      group: preview-pr-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     steps:
       - name: Checkout PR head
@@ -147,6 +152,77 @@ jobs:
             echo "files=" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Wait for Deno Deploy build status
+        id: deploy
+        # Chi repo goc moi co Deno Deploy build status (fork khong co app/secret).
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          state=""
+          description=""
+          target=""
+          # Deno Deploy build thuong xong trong ~1 phut; cho toi da 20 x 15s = 5 phut.
+          for attempt in $(seq 1 20); do
+            payload=$(curl -sS -m 20 -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$SHA/status" || echo '{}')
+            line=$(printf '%s' "$payload" \
+              | jq -r '.statuses[]? | select(.context | startswith("deploy/")) | "\(.state)\t\(.description)\t\(.target_url)"' 2>/dev/null \
+              | head -n1 || true)
+            if [ -n "$line" ]; then
+              state=$(printf '%s' "$line" | cut -f1)
+              description=$(printf '%s' "$line" | cut -f2)
+              target=$(printf '%s' "$line" | cut -f3)
+            fi
+            if [ -n "$state" ] && [ "$state" != "pending" ]; then
+              break
+            fi
+            sleep 15
+          done
+          {
+            echo "state=$state"
+            echo "description=$description"
+            echo "target_url=$target"
+          } >> "$GITHUB_OUTPUT"
+          echo "Deno Deploy status: ${state:-<khong co>} - ${description:-<khong co>} ${target}"
+
+      - name: Resolve public preview URL (tuy chon — can DENO_DEPLOY_TOKEN)
+        id: preview
+        # Khong co secret thi bo qua (khong fail): comment chi hien trang thai build.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          DENO_DEPLOY_TOKEN: ${{ secrets.DENO_DEPLOY_TOKEN }}
+          DENO_DEPLOY_PROJECT: ${{ vars.DENO_DEPLOY_PROJECT || 'deno-dns' }}
+        run: |
+          set -u
+          url=""
+          if [ -z "${DENO_DEPLOY_TOKEN:-}" ]; then
+            echo "::notice::Chua co secret DENO_DEPLOY_TOKEN - bo qua buoc lay preview URL truc tiep."
+            echo "url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          subject=$(git log -1 --format=%s HEAD)
+          payload=$(curl -sS -m 30 -H "Authorization: Bearer $DENO_DEPLOY_TOKEN" \
+            "https://api.deno.com/v1/projects/$DENO_DEPLOY_PROJECT/deployments?limit=50" || echo '[]')
+          # Uu tien deployment khop commit message; neu khong thi deployment moi nhat thanh cong.
+          url=$(printf '%s' "$payload" | jq -r --arg s "$subject" '
+            ([.[]? | select(.status == "success")
+              | select(((.domains // []) | length) > 0)]) as $ok
+            | ($ok | sort_by(.createdAt) | reverse) as $newest
+            | (($newest | map(select(.description == $s)) | .[0]) // $newest[0] // {})
+            | .domains[0] // empty' 2>/dev/null || true)
+          case "$url" in
+            http*) ;;
+            "") ;;
+            *) url="https://$url" ;;
+          esac
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview URL: ${url:-<khong tim thay>}"
+
       - name: Stage preview site
         if: steps.docs.outputs.has_docs == 'true'
         run: |
@@ -163,15 +239,19 @@ jobs:
 
       - name: Post / update sticky PR comment
         # continue-on-error: PR tu fork co token read-only (khong comment duoc) — van giu job xanh
-        if: steps.docs.outputs.has_docs == 'true'
         continue-on-error: true
         uses: actions/github-script@v7
         env:
           DOCS_FILES: ${{ steps.docs.outputs.files }}
           PR_NUMBER: ${{ github.event.number }}
+          DEPLOY_STATE: ${{ steps.deploy.outputs.state }}
+          DEPLOY_DESC: ${{ steps.deploy.outputs.description }}
+          DEPLOY_TARGET: ${{ steps.deploy.outputs.target_url }}
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         with:
           script: |
-            const marker = "<!-- deno-dns-docs-preview -->";
+            const marker = "<!-- deno-dns-preview -->";
             const files = (process.env.DOCS_FILES || "")
               .split(",")
               .filter((f) => f.trim().length > 0);
@@ -179,19 +259,64 @@ jobs:
               `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}` +
               `/actions/runs/${process.env.GITHUB_RUN_ID}`;
             const sha = context.payload.pull_request.head.sha.slice(0, 7);
+            const state = process.env.DEPLOY_STATE || "";
+            const desc = process.env.DEPLOY_DESC || "";
+            const buildUrl = process.env.DEPLOY_TARGET || "";
+            const previewUrl = process.env.PREVIEW_URL || "";
+
+            const icons = {
+              success: "✅",
+              failure: "❌",
+              error: "❌",
+              pending: "⏳",
+            };
+            const deploy = [];
+            if (process.env.IS_FORK === "true") {
+              deploy.push(
+                "_PR từ fork: không có Deno Deploy preview (fork không nhận secret)._",
+              );
+            } else if (!state) {
+              deploy.push("_Chưa thấy Deno Deploy build status cho commit này._");
+            } else {
+              deploy.push(
+                `**Deno Deploy**: ${icons[state] || state}${desc ? ` ${desc}` : ""}`,
+              );
+              if (buildUrl) deploy.push(`- 🔧 [Chi tiết build](${buildUrl})`);
+              if (previewUrl) {
+                deploy.push(`- 🌐 **Preview**: [${previewUrl}](${previewUrl})`);
+              } else {
+                deploy.push(
+                  "- 🌐 Preview URL trực tiếp: thêm secret `DENO_DEPLOY_TOKEN` " +
+                    "(xem `docs/CONTRIBUTING.md`) để comment kèm link deploy.",
+                );
+              }
+            }
+
+            const docs = files.length > 0
+              ? [
+                "### 📄 Docs preview",
+                "",
+                "Tài liệu sẽ được deploy lên GitHub Pages khi merge vào `main`. " +
+                "File thay đổi:",
+                ...files.map((f) => `- \`${f}\``),
+                "",
+                `📦 Tải bản preview: [workflow run](${runUrl}) → artifact ` +
+                `**\`docs-preview-pr-${process.env.PR_NUMBER}\`** ` +
+                "(tải về, giải nén để xem).",
+              ]
+              : [
+                "_Không có thay đổi trong `docs/`, `README.md` hoặc `CHANGELOG.md`._",
+              ];
+
             const body = [
               marker,
-              `### 📄 Docs preview — \`${sha}\``,
+              `### 🚀 Preview — \`${sha}\``,
               "",
-              "Tài liệu trong PR này sẽ được deploy lên GitHub Pages khi merge vào `main`.",
-              "File docs thay đổi:",
-              ...files.map((f) => `- \`${f}\``),
+              ...deploy,
               "",
-              `📦 Tải bản preview: [workflow run](${runUrl}) → artifact ` +
-                `**\`docs-preview-pr-${process.env.PR_NUMBER}\`** (tải về, giải nén để xem).`,
+              ...docs,
               "",
-              "_Comment này tự cập nhật khi bạn push commit mới sửa `docs/`, `README.md` " +
-                "hoặc `CHANGELOG.md`._",
+              "_Comment này tự cập nhật mỗi lần push commit mới vào PR._",
             ].join("\n");
 
             const { owner, repo } = context.repo;

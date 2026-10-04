@@ -90,8 +90,18 @@ src/
   `refactor(scope): ...`, `chore(scope): ...`
 - Mỗi PR phải giữ xanh: `check + lint + fmt + test` (CI chạy tự động
   `.github/workflows/deno.yml`)
-- PR sửa `docs/`, `README.md` hoặc `CHANGELOG.md` sẽ nhận **comment preview** tự
-  động (artifact `docs-preview-pr-<số>`, tải từ workflow run — plan §6.2)
+- Mỗi PR nhận **comment sticky `🚀 Preview`** (job `preview`, plan §6.2): trạng
+  thái build Deno Deploy (commit status `deploy/<owner>/<repo>`) + link console.
+  PR sửa `docs/`, `README.md` hoặc `CHANGELOG.md` được upload artifact
+  `docs-preview-pr-<số>` (giữ 14 ngày, tải từ workflow run)
+- **Preview URL trực tiếp (tùy chọn)**: thêm secret `DENO_DEPLOY_TOKEN` (token
+  Deno Deploy) tại Settings → Secrets and variables → Actions → job sẽ gọi
+  `https://api.deno.com/v1/projects/<project>/deployments` và in
+  `https://<domain>.deno.dev` vào comment. Không có token → job vẫn xanh,
+  comment chỉ thiếu dòng URL. Project mặc định `deno-dns`; đổi bằng repository
+  variable `DENO_DEPLOY_PROJECT`
+- **Pages là điều kiện một lần** cho job `docs`: bật Settings → Pages → Source =
+  _GitHub Actions_ (chưa bật thì `deploy-pages` fail với lỗi 404)
 - Test mới: bọc IO/timer trong `try/finally` (dispose, restore fetch stub…); mỗi
   test tự reset singleton qua `resetKv()`/`resetCounters()` nếu cần
 - Không commit file môi trường (`.env`) hay dữ liệu KV

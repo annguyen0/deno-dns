@@ -121,8 +121,11 @@ src/
 - `upstream_dns_list.json` (39KB): catalog upstream tĩnh **thủ công** — CHƯA nối
   vào code catalog; cơ hội bulk import khi cần (ARCHITECTURE §11).
 - CI/CD: `.github/workflows/deno.yml` — lint · fmt · check · test · `deno audit`
-  · deploy docs lên GitHub Pages · **preview artifact + comment sticky trên PR**
-  khi docs thay đổi (plan §6.2).
+  · deploy docs lên GitHub Pages.
+- **Preview PR** (plan §6.2): comment sticky `🚀 Preview` trên mỗi PR — trạng
+  thái build Deno Deploy + link console, cộng **Preview URL** khi đã thêm secret
+  `DENO_DEPLOY_TOKEN` (tùy chọn — `docs/CONTRIBUTING.md` §6); PR sửa `docs/`,
+  `README.md` hoặc `CHANGELOG.md` kèm artifact `docs-preview-pr-<n>`.
 
 ## 8. Gioi han da biet
 
