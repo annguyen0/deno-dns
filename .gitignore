@@ -5,6 +5,9 @@
 .env.production.local
 .env.local
 
+# Kilo agent workspace (local plans/agents — never commit)
+.kilo/
+
 # Fresh build directory
 _fresh/
 # npm + other dependencies
