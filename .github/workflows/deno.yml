@@ -1,0 +1,113 @@
+# CI/CD cho deno-dns (plan §6).
+# Luu y so voi ban nhap trong plan:
+# - setup-deno@v2 khong co input "cache-dir" → dung actions/cache rieng tren DENO_DIR mac dinh
+# - job "docs" phai nam trong jobs: va dung environment github-pages cho deploy-pages
+# - upload-pages-artifact chi nhan 1 path → stage vao _site/ truoc
+# - lenh security scan trong plan (jsr.io/std/security/doc/cli.ts) khong ton tai →
+#   thay bang `deno audit` (OSV, co san Deno 2.9.7) — dong co neu phat hien CVE
+
+name: deno-dns CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  DENO_VERSION: "2.9.7"
+
+jobs:
+  lint-format-check:
+    name: Lint · Format · Type-Check · Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Cache Deno artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/deno
+          key: deno-${{ runner.os }}-${{ hashFiles('deno.lock') }}
+
+      - name: Type-check
+        run: deno task check
+
+      - name: Lint
+        run: deno task lint
+
+      - name: Format check
+        run: deno fmt --check
+
+      - name: Run test suite
+        run: deno test
+
+  security-scan:
+    name: Dependency Security Scan
+    needs: lint-format-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Cache Deno artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/deno
+          key: deno-${{ runner.os }}-${{ hashFiles('deno.lock') }}
+
+      - name: Audit dependencies (OSV — deno audit)
+        run: deno audit --ignore-registry-errors
+
+  docs:
+    name: Publish Architecture Docs
+    needs: lint-format-check
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Stage docs site (Markdown — khong can render)
+        run: |
+          mkdir -p _site
+          cp docs/*.md README.md CHANGELOG.md _site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
