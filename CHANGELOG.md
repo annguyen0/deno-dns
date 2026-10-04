@@ -7,15 +7,21 @@ bản theo [Semantic Versioning](https://semver.org/lang/vi/).
 ## [0.2.0] — 2026-10-04
 
 ### Added
-- multilingual documentation completion (README, ARCHITECTURE, SOFTWARE_DESIGN, CONTRIBUTING)
+
+- multilingual documentation completion (README, ARCHITECTURE, SOFTWARE_DESIGN,
+  CONTRIBUTING)
 
 ### Changed
-- CI workflow refactored into separate lint/test/security/pages/preview workflows
+
+- CI workflow refactored into separate lint/test/security/pages/preview
+  workflows
 
 ### Fixed
+
 - GitHub Pages 404 root cause identified and documented
 
 ### Removed
+
 - (none for 0.2.0)
 
 ## [Unreleased]

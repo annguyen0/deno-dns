@@ -1,8 +1,9 @@
 # 🤝 Contributing (CONTRIBUTING)
 
-The **deno-dns** project — a DNS-over-HTTPS server on Deno + Deno KV. Documentation
-and code comments use **English** (without required diacritics) — please maintain
-this language when contributing, except for identifier/code in English.
+The **deno-dns** project — a DNS-over-HTTPS server on Deno + Deno KV.
+Documentation and code comments use **English** (without required diacritics) —
+please maintain this language when contributing, except for identifier/code in
+English.
 
 ## 1. Requirements
 
@@ -43,8 +44,8 @@ deno task migrate-kv       # remove legacy ["blocked_domains", ...] keys (manual
 deno task bench-hot-path   # benchmark policy lookup — p50 < 20ms (plan §10)
 ```
 
-- `migrate-kv` only DELETE `blocked_domains/*`; use `DENO_KV_PATH=<path>` to point
-  to the KV you want to migrate (do not touch real KV if uncertain).
+- `migrate-kv` only DELETE `blocked_domains/*`; use `DENO_KV_PATH=<path>` to
+  point to the KV you want to migrate (do not touch real KV if uncertain).
 - `bench-hot-path` runs entirely in-memory (0 KV ops) — exit 1 if p50 ≥ 20ms.
 
 ## 4. Code conventions
@@ -53,8 +54,8 @@ deno task bench-hot-path   # benchmark policy lookup — p50 < 20ms (plan §10)
   `src/foo_test.ts` (module `module_name_test.ts`)
 - **Export**: `PascalCase` for class (`BlocklistStore`, `QueryCounters`),
   `camelCase` for functions; constant `SCREAMING_SNAKE_CASE`
-- **KV key**: only declare in `src/kv/schema.ts` (`MANIFEST_KEY`,
-  `chunkKey()`, `STATS_KEYS`, ...) — **do not** scatter key names in other modules
+- **KV key**: only declare in `src/kv/schema.ts` (`MANIFEST_KEY`, `chunkKey()`,
+  `STATS_KEYS`, ...) — **do not** scatter key names in other modules
 - **Shared interface** (used by ≥ 2 modules): `src/types/index.ts`
 - **Hot path DNS**: every policy check
   (`isWhitelisted`/`getRewriteIP`/`isBlocked`) must be in-memory lookup — **0
@@ -90,14 +91,15 @@ src/
   `.github/workflows/deno.yml`)
 - Each PR receives **sticky `🚀 Preview`** comment (job `preview`, plan §6.2):
   deployment status + file changes + artifact.
-- **Preview URL directly (optional)**: add secret `DENO_DEPLOY_TOKEN` (Deno Deploy
-  token) at Settings → Secrets and variables → Actions; the job will call
+- **Preview URL directly (optional)**: add secret `DENO_DEPLOY_TOKEN` (Deno
+  Deploy token) at Settings → Secrets and variables → Actions; the job will call
   `https://api.deno.com/v1/projects/<project>/deployments` and output
   `https://<domain>.deno.dev` in the comment. Without token — job stays green,
   comment only missing line. Default project `deno-dns`; change via repository
   variable `DENO_DEPLOY_PROJECT`
 - **Pages is a one-time condition** for `docs` job: enable Settings → Pages →
-  Source = _GitHub Actions_ (if not enabled then `deploy-pages` fails with 404 error)
+  Source = _GitHub Actions_ (if not enabled then `deploy-pages` fails with 404
+  error)
 - New tests: wrap IO/timer in `try/finally` (dispose, restore fetch stub…); each
   test reset singleton via `resetKv()`/`resetCounters()` if needed
 - Do not commit environment files (`.env`) or KV data

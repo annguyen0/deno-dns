@@ -14,9 +14,12 @@
   `GET ?name=&type=` (JSON + dns-message). Lib `dns-packet@5.6.1`.
 - **Loc 4 tang**:
   `Whitelist → Rewrite (wildcard *.domain) → Blocklist (suffix-match) → Forward Upstream`.
-- **Blocklist Catalog**: 6 sources (Chong Lua Dao HieuPC 🇻🇳, OISD, StevenBlack default
- + AdGuard, URLHaus, Peter Lowe). Add/remove/toggle custom URL. Sync snapshot
- (chunks + manifest) each time, 15s/source timeout.
+- **Blocklist Catalog**: 6 sources (Chong Lua Dao HieuPC 🇻🇳, OISD, StevenBlack
+  default
+
+* AdGuard, URLHaus, Peter Lowe). Add/remove/toggle custom URL. Sync snapshot
+  (chunks + manifest) each time, 15s/source timeout.
+
 - **Upstream Catalog**: 16 upstreams (`src/upstream/catalog.ts`): Cloudflare
   1.1.1.1, Google, Quad9, AdGuard, Mullvad, Family, OpenDNS, DNS.SB... Failover
   sequentially, timeout 3s.
@@ -47,10 +50,11 @@ deno task bench-hot-path   # benchmark hot path — p50 < 20ms, 0 KV op
 deno task migrate-kv       # Delete legacy KV key blocked_domains/* (manual)
 ```
 
-Implementation: `deno run --allow-net --allow-env --allow-read --unstable-kv main.ts`
+Implementation:
+`deno run --allow-net --allow-env --allow-read --unstable-kv main.ts`
 
-**Initial admin setup**: open `http://localhost:8000` → enter password ≥ 6 characters
-(`POST /api/setup`) → receive `doh_session` cookie. Or via UI:
+**Initial admin setup**: open `http://localhost:8000` → enter password ≥ 6
+characters (`POST /api/setup`) → receive `doh_session` cookie. Or via UI:
 
 ```bash
 ADMIN_PASSWORD="mat-khau-manh" deno task start
@@ -72,24 +76,24 @@ DoH Testing button on Dashboard is the fastest way.
   `https://<host>/dns-query`
 - **iOS 14+**: profile `.mobileconfig` voi
   `ServerURL = https://<host>/dns-query`
-- **Android**: dung app RethinkDNS/Nebulo voi Custom DoH endpoint (Private DNS root only supports DoT)
+- **Android**: dung app RethinkDNS/Nebulo voi Custom DoH endpoint (Private DNS
+  root only supports DoT)
 
 ## 4. Bien moi truong
 
 | Bien             | Mac dinh  | Mo ta                                                               |
 | ---------------- | --------- | ------------------------------------------------------------------- |
-| `ADMIN_PASSWORD` | trong     | Set → skip setup, login comparison directly. For Deploy/CI.    |
+| `ADMIN_PASSWORD` | trong     | Set → skip setup, login comparison directly. For Deploy/CI.         |
 | `DENO_KV_PATH`   | Deploy KV | Path KV local. VD: `DENO_KV_PATH=./data/kv.sqlite deno task start`. |
 | `PORT`           | `8000`    | `Deno.serve` tu doc khi deploy.                                     |
 
 ## 5. Deploy Deno Deploy
 
-1. Push repo to GitHub. 2. dash.deno.com → New Project → entry `main.ts`. 3.
-   Add env `ADMIN_PASSWORD`. 4. Default KV persistent. DoH endpoint:
+1. Push repo to GitHub. 2. dash.deno.com → New Project → entry `main.ts`. 3. Add
+   env `ADMIN_PASSWORD`. 4. Default KV persistent. DoH endpoint:
    `https://<project>.deno.net/dns-query`.
 
-> Rate-limit in-memory → per-instance, not global (trade-off note, see
-> ADR-2).
+> Rate-limit in-memory → per-instance, not global (trade-off note, see ADR-2).
 
 ## 6. API cheat-sheet (admin can session Cookie/Bearer)
 
@@ -122,9 +126,10 @@ src/
 - CI/CD: `.github/workflows/deno.yml` — lint · fmt · check · test · `deno audit`
   · deploy docs lên GitHub Pages.
 - **Preview PR** (plan §6.2): comment sticky `🚀 Preview` trên mỗi PR — trạng
-  Deno Deploy build status + link console, with Preview URL when DENO_DEPLOY_TOKEN added
-  `DENO_DEPLOY_TOKEN` (optional — `docs/CONTRIBUTING.md` §6); PR edit `docs/`,
-  `README.md` or `CHANGELOG.md` with artifact `docs-preview-pr-<n>`.
+  Deno Deploy build status + link console, with Preview URL when
+  DENO_DEPLOY_TOKEN added `DENO_DEPLOY_TOKEN` (optional — `docs/CONTRIBUTING.md`
+  §6); PR edit `docs/`, `README.md` or `CHANGELOG.md` with artifact
+  `docs-preview-pr-<n>`.
 
 ## 8. Gioi han da biet
 
@@ -135,9 +140,9 @@ src/
   `deno task migrate-kv`.
 - Documentation in Vietnamese — limited to reviewers who read Vietnamese.
 
-Resolved: snapshot sync replaces whole (no add-only, no delete)
-· logs ring buffer in-memory (no KV write per request) · dashboard escape HTML
-(no XSS innerHTML) · SSRF guard URL custom · co test (47) + CI.
+Resolved: snapshot sync replaces whole (no add-only, no delete) · logs ring
+buffer in-memory (no KV write per request) · dashboard escape HTML (no XSS
+innerHTML) · SSRF guard URL custom · co test (47) + CI.
 
 ## 9. Ghi nhan
 
