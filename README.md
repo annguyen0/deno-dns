@@ -5,7 +5,8 @@
 > DDoS/Brute-force, kem Dashboard NextDNS-style.
 
 [🏗️ Kien truc](docs/ARCHITECTURE.md) ·
-[🧩 Thiet ke phan mem](docs/SOFTWARE_DESIGN.md)
+[🧩 Thiet ke phan mem](docs/SOFTWARE_DESIGN.md) · [📝 Changelog](CHANGELOG.md) ·
+[🤝 Contributing](docs/CONTRIBUTING.md)
 
 ## 1. Tinh nang
 
@@ -14,11 +15,11 @@
 - **Loc 4 tang**:
   `Whitelist → Rewrite (wildcard *.domain) → Blocklist (suffix-match) → Forward Upstream`.
 - **Blocklist Catalog**: 6 nguon (Chong Lua Dao HieuPC 🇻🇳, OISD, StevenBlack bat
-  mac dinh + AdGuard, URLHaus, Peter Lowe). Them/xoa/toggle custom URL. Sync
-  batch 500 ops, timeout 15s/nguon.
-- **Upstream Catalog**: 16 upstreams (`src/catalog.ts`): Cloudflare 1.1.1.1,
-  Google, Quad9, AdGuard, Mullvad, Family, OpenDNS, DNS.SB... Failover tuan tu,
-  timeout 3s.
+  mac dinh + AdGuard, URLHaus, Peter Lowe). Them/xoa/toggle custom URL. Sync ghi
+  snapshot (chunks + manifest) moi lan, timeout 15s/nguon.
+- **Upstream Catalog**: 16 upstreams (`src/upstream/catalog.ts`): Cloudflare
+  1.1.1.1, Google, Quad9, AdGuard, Mullvad, Family, OpenDNS, DNS.SB... Failover
+  tuan tu, timeout 3s.
 - **Dashboard** (`public/index.html`): metrics, DDoS panel, tabs
   Upstream/Blocklist/Whitelist+Rewrite, logs 50 moi nhat, poll 4s.
 - **Bao mat**: PBKDF2-SHA256 100k + salt 16B · Session UUID TTL 7 ngay · Cookie
@@ -38,6 +39,12 @@ Yeu cau: **Deno 2.x**.
 ```bash
 deno task start   # http://localhost:8000
 deno task dev     # watch mode
+deno task test    # 47/47 test
+
+# Cong kiem tra bat buoc truoc PR (xem docs/CONTRIBUTING.md):
+deno task check && deno task lint && deno task fmt --check && deno test
+deno task bench-hot-path   # benchmark hot path — p50 < 20ms, 0 KV op
+deno task migrate-kv       # xoa khoa KV legacy blocked_domains/* (manual)
 ```
 
 Thuc chat: `deno run --allow-net --allow-env --allow-read --unstable-kv main.ts`
@@ -104,17 +111,30 @@ curl -b jar.txt -X POST $BASE/api/rewrites -H 'Content-Type: application/json' -
 ## 7. Cau truc repo
 
 ```
-main.ts (router 286) · deno.json · src/dns.ts (253) · src/storage.ts (375) · src/auth.ts (156) · src/ratelimit.ts (162) · src/catalog.ts (233) · public/index.html (791) · docs/
+main.ts (init + dispatch) · deno.json (tasks, "unstable": ["kv"]) · public/index.html (dashboard)
+main.ts ─▶ src/api/routes.ts + src/diag/diag.ts ─▶ src/storage.ts (facade + sync)
+src/
+  types/ kv/ blocklist/ counters/ clientip/ ratelimit/ ssrf/ upstream/
+  auth/ dns/ api/ diag/ bench/        # chi tiet: docs/CONTRIBUTING.md §5
 ```
 
-`components/ islands/ utils.ts static/` la di san template Fresh, khong duoc
-import.
+- `upstream_dns_list.json` (39KB): catalog upstream tĩnh **thủ công** — CHƯA nối
+  vào code catalog; cơ hội bulk import khi cần (ARCHITECTURE §11).
+- CI/CD: `.github/workflows/deno.yml` — lint · fmt · check · test · `deno audit`
+  · deploy docs lên GitHub Pages.
 
 ## 8. Gioi han da biet
 
-Sync chi them (khong xoa domain list da tat) · Logs 50 moi nhat, khong TTL ·
-Chua co test/CI · Dashboard render logs bang innerHTML (can escape) · Custom
-sync URL chua validate SSRF.
+- Rate-limit / logs / counters **in-memory per-instance** — không share giữa các
+  instance (multi-region cần KV atomic/Redis; xem ADR-2).
+- `upstream_dns_list.json` chưa import vào catalog (bulk import thủ công).
+- Key KV legacy `blocked_domains/*` còn sót trong data cũ →
+  `deno task migrate-kv`.
+- Tài liệu tiếng Việt — hạn chế với reviewer không đọc tiếng Việt.
+
+Da giai quyet: sync snapshot thay the toan bo (khong con "chi them, khong xoa")
+· logs ring buffer in-memory (khong con ghi KV/request) · dashboard escape HTML
+(khong con XSS innerHTML) · SSRF guard URL custom · co test (47) + CI.
 
 ## 9. Ghi nhan
 

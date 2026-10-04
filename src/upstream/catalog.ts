@@ -6,6 +6,8 @@
 //   blocklist poll) + cap nhat lap tuc sau moi admin CRUD o instance do.
 // - Giao dien UpstreamItem/BlocklistItem: src/types/index.ts (shared).
 // - Logic chon upstream theo region: src/upstream/selector.ts.
+// - upstream_dns_list.json (goc repo, 39KB) la catalog TINH thu cong — khong duoc
+//   import tu code; neu can bulk import thi dua vao day mot lan (plan §11 item 4).
 
 import type { BlocklistItem, UpstreamItem } from "../types/index.ts";
 import { CONFIG_KEYS } from "../kv/schema.ts";
