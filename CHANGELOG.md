@@ -28,67 +28,71 @@ bản theo [Semantic Versioning](https://semver.org/lang/vi/).
 
 ### Added
 
-- **Snapshot MVCC blocklist**: sync ghi chunk `blocklist/v/{version}/{i}` trước,
-  manifest `blocklist/manifest` cuối cùng làm giao diện duy nhất; giữ 2 version
-  trong KV, tự dọn chunk cũ (self-healing nếu lần ghi trước bị ngắt).
-- **Hot path 0 KV**: mọi policy check DNS (`isWhitelisted` → `getRewriteIP` →
-  `isBlocked`) tra bộ nhớ in-memory; benchmark `deno task bench-hot-path` (100k
-  lần, p50 ≈ 1.9µs — NFR p50 < 20ms).
-- **Chỉ tin IP client từ nền tảng**: header `x-denoforwarded-for` +
-  `remoteAddr.hostname`, từ chối IP riêng/loopback từ header (chống spoof).
-- **SSRF guard**: `assertSafeFetchUrl()` — chỉ `https://`, chặn hostname nội bộ
-  và IP riêng/link-local/metadata cho URL blocklist/upstream tùy chỉnh.
-- **Counter flush gom (atomic)**: 3 khóa `KvU64` (`total/blocked/allowed`) trong
-  1 commit `atomic().sum()`; flush rong không chạm KV (idempotent); flush khi
-  SIGINT trước khi thoát.
-- **Ring buffer log 50 mục** in-memory thay vì ghi KV mỗi request (bảo mật/riêng
-  tư).
-- **Rate limit in-memory**: TokenBucket DoH 60 req/s burst 120, API 120 req/min,
-  login 5 sai khóa 15 phút, sync cooldown 180s; LRU cap 100k khóa chống DoS bộ
-  nhớ.
-- **Script validation**: `deno task migrate-kv` (dọn khóa legacy
-  `blocked_domains/*`), `deno task bench-hot-path`.
-- **Test suite 47 test** qua 7 module (`*_test.ts` cạnh nguồn).
+- **Snapshot MVCC blocklist**: sync writes chunks `blocklist/v/{version}/{i}`
+  first, manifest `blocklist/manifest` last as the sole interface; keeps 2
+  versions in KV, auto-cleans stale chunks (self-healing if a previous write was
+  interrupted).
+- **Hot path 0 KV**: all DNS policy checks (`isWhitelisted` → `getRewriteIP` →
+  `isBlocked`) resolve in-memory; benchmark `deno task bench-hot-path` (100k
+  iterations, p50 ≈ 1.9µs — NFR p50 < 20ms).
+- **Trust client IP from the platform only**: header `x-denoforwarded-for` +
+  `remoteAddr.hostname`, private/loopback IPs from the header are rejected
+  (anti-spoofing).
+- **SSRF guard**: `assertSafeFetchUrl()` — `https://` only, blocks internal
+  hostnames and private/link-local/metadata IPs for custom blocklist/upstream
+  URLs.
+- **Batched counter flush (atomic)**: 3 `KvU64` keys (`total/blocked/allowed`)
+  in one `atomic().sum()` commit; steady-state flush never touches KV
+  (idempotent); flush on SIGINT before exit.
+- **Ring buffer log, 50 entries** in-memory instead of writing KV per request
+  (security/privacy).
+- **In-memory rate limit**: TokenBucket DoH 60 req/s burst 120, API 120 req/min,
+  login 5 wrong keys locks 15 minutes, sync cooldown 180s; LRU cap 100k keys
+  against memory DoS.
+- **Validation scripts**: `deno task migrate-kv` (cleans up legacy
+  `blocked_domains/*` keys), `deno task bench-hot-path`.
+- **Test suite, 47 tests** across 7 modules (`*_test.ts` next to source).
 - **CI/CD GitHub Actions** `.github/workflows/deno.yml`: lint · fmt · check ·
-  test trên mỗi PR/push; quét bảo mật khóa phụ thuộc; deploy tài liệu lên GitHub
-  Pages.
-- **Preview cho PR** (job `preview`, plan §6.2): chờ commit status `deploy/*`
-  của Deno Deploy rồi đăng **comment sticky** trên PR — trạng thái build + link
-  console, kèm **Preview URL** `https://<domain>.deno.dev` khi có secret
-  `DENO_DEPLOY_TOKEN` (không có token: vẫn xanh, chỉ thiếu dòng URL). PR sửa
-  `docs/`, `README.md` hoặc `CHANGELOG.md` được upload artifact
-  `docs-preview-pr-<n>` (giữ 14 ngày). Fork PR không nhận secret → comment chỉ
-  hiện phần docs.
-- Tài liệu: `docs/CONTRIBUTING.md`, `docs/CODE_OF_CONDUCT.md`, cấu trúc lại
-  `docs/ARCHITECTURE.md` §1–§11 (tiếng Việt, C4 + ADR-1…ADR-7).
+  test on every PR/push; dependency security scan; docs deploy to GitHub Pages.
+- **PR preview** (job `preview`, plan §6.2): waits for the Deno Deploy
+  `deploy/*` commit status, then posts a **sticky comment** on the PR — build
+  state + console link, plus a **Preview URL** `https://<domain>.deno.dev` when
+  the `DENO_DEPLOY_TOKEN` secret is set (without token: still green, just no URL
+  line). PRs touching `docs/`, `README.md` or `CHANGELOG.md` upload artifact
+  `docs-preview-pr-<n>` (retained 14 days). Fork PRs get no secrets → comment
+  shows the docs part only.
+- Docs: `docs/CONTRIBUTING.md`, `docs/CODE_OF_CONDUCT.md`, restructured
+  `docs/ARCHITECTURE.md` §1–§11 (Vietnamese, C4 + ADR-1…ADR-7).
 
 ### Changed
 
-- **Cấu trúc lại `src/`** theo lớp (plan §4.2):
+- **Restructured `src/`** into layers (plan §4.2):
   `types/ kv/ blocklist/ counters/
   clientip/ ratelimit/ ssrf/ upstream/ auth/ dns/ api/ diag/`
-  — import paths mới, test di chuyển kèm nguồn.
-- **Schema KV thống nhất**: khóa tập trung ở `src/kv/schema.ts` (`MANIFEST_KEY`,
+  — new import paths, tests moved with their source.
+- **Unified KV schema**: keys centralized in `src/kv/schema.ts` (`MANIFEST_KEY`,
   `chunkKey`, `STATS_KEYS`, `CONFIG_KEYS`, …).
-- **`main.ts`**: chỉ còn khởi tạo + CORS + rate-limit + dispatch; handler tách
-  sang `src/api/routes.ts` (auth + CRUD) và `src/diag/diag.ts`.
-- **`DENO_KV_PATH`**: `openKv()` tự đọc env (Deno 2.9.7 không tự đọc) — khớp tài
-  liệu README.
-- NFR: p50 self-response < **20ms với 0 KV op** (trước: <150ms với 2–3 KV read).
+- **`main.ts`**: now only init + CORS + rate-limit + dispatch; handlers split
+  into `src/api/routes.ts` (auth + CRUD) and `src/diag/diag.ts`.
+- **`DENO_KV_PATH`**: `openKv()` reads the env itself (Deno 2.9.7 does not read
+  it automatically) — matches the README.
+- NFR: p50 self-response < **20ms with 0 KV ops** (previously: <150ms with 2–3
+  KV reads).
 
 ### Fixed
 
-- Dashboard render logs bằng escape HTML (không còn nguy cơ XSS innerHTML).
-- Sync blocklist semantics mới: snapshot thay thế toàn bộ — domain của nguồn đã
-  tắt/lỗi không còn bị tích tụ vĩnh viễn.
-- Xóa code chết template Fresh (`components/`, `islands/`, `utils.ts`,
+- Dashboard renders logs with HTML escaping (no more innerHTML XSS risk).
+- New blocklist sync semantics: snapshot replaces the whole set — domains from
+  disabled/failed sources no longer accumulate forever.
+- Removed dead Fresh template code (`components/`, `islands/`, `utils.ts`,
   `static/`).
 
 ### Removed
 
-- Khóa KV phẳng `blocked_domains/*` khỏi toàn bộ code (còn trong data cũ → chạy
-  `deno task migrate-kv`).
-- Ghi KV theo request cho logs/counter (thay bằng ring buffer + flush gom).
+- Flat KV keys `blocked_domains/*` from all code (still present in old data →
+  run `deno task migrate-kv`).
+- Per-request KV writes for logs/counters (replaced by ring buffer + batched
+  flush).
 
 ## [0.1.0] — 2026-10-03
 
