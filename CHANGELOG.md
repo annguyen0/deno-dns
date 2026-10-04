@@ -9,7 +9,7 @@ bản theo [Semantic Versioning](https://semver.org/lang/vi/).
 ### Added
 
 - **_Smoke test tạm_**: dòng này chỉ để kiểm tra job `docs-preview` của PR này
-  (PR sẽ đóng, không merge).
+  (PR sẽ đóng, không merge) — lan 2.
 - **Snapshot MVCC blocklist**: sync ghi chunk `blocklist/v/{version}/{i}` trước,
   manifest `blocklist/manifest` cuối cùng làm giao diện duy nhất; giữ 2 version
   trong KV, tự dọn chunk cũ (self-healing nếu lần ghi trước bị ngắt).
