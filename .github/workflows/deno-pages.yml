@@ -33,11 +33,37 @@ jobs:
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
-      - name: Stage docs site (Markdown — khong can render)
+      - name: Stage docs site
         run: |
-          mkdir -p _site
-          cp docs/*.md README.md CHANGELOG.md _site/
-          cp README.md _site/index.html
+          mkdir -p _site/docs
+          cp docs/*.md _site/docs/
+          cp CHANGELOG.md _site/
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>deno-dns — documentation</title>
+            <style>
+              body{font-family:system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;line-height:1.6}
+              h1{border-bottom:1px solid #e2e2e2;padding-bottom:.4rem}
+              a{color:#0969da;text-decoration:none} a:hover{text-decoration:underline}
+            </style>
+          </head>
+          <body>
+            <h1>deno-dns — documentation</h1>
+            <p>DoH server (RFC 8484) on Deno + Deno KV. Doc-as-code: docs are published
+               as raw Markdown under <code>/docs/</code>.</p>
+            <ul>
+              <li><a href="docs/ARCHITECTURE.md">Architecture</a></li>
+              <li><a href="docs/SOFTWARE_DESIGN.md">Software design</a></li>
+              <li><a href="docs/CONTRIBUTING.md">Contributing</a></li>
+              <li><a href="CHANGELOG.md">Changelog</a></li>
+            </ul>
+          </body>
+          </html>
+          EOF
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
