@@ -1,8 +1,8 @@
 # 🛡️ deno-dns — DNS-over-HTTPS Serverless co Loc & Dashboard
 
-> DoH server (RFC 8484) chay tren **Deno + Deno KV**: loc quang cao / ma doc /
-> lua dao 🇻🇳, Local DNS Rewrite, Whitelist, failover nhieu Upstream, chong
-> DDoS/Brute-force, kem Dashboard NextDNS-style.
+> DoH server (RFC 8484) running on **Deno + Deno KV**: advertising content /
+> document filtering / DNS spoofing prevention 🇻🇳, Local DNS Rewrite, Whitelist,
+> failover many Upstream, DDoS/Brute-force protection, NextDNS-style Dashboard.
 
 [🏗️ Kien truc](docs/ARCHITECTURE.md) ·
 [🧩 Thiet ke phan mem](docs/SOFTWARE_DESIGN.md) · [📝 Changelog](CHANGELOG.md) ·
@@ -14,18 +14,18 @@
   `GET ?name=&type=` (JSON + dns-message). Lib `dns-packet@5.6.1`.
 - **Loc 4 tang**:
   `Whitelist → Rewrite (wildcard *.domain) → Blocklist (suffix-match) → Forward Upstream`.
-- **Blocklist Catalog**: 6 nguon (Chong Lua Dao HieuPC 🇻🇳, OISD, StevenBlack bat
-  mac dinh + AdGuard, URLHaus, Peter Lowe). Them/xoa/toggle custom URL. Sync ghi
-  snapshot (chunks + manifest) moi lan, timeout 15s/nguon.
+- **Blocklist Catalog**: 6 sources (Chong Lua Dao HieuPC 🇻🇳, OISD, StevenBlack default
+ + AdGuard, URLHaus, Peter Lowe). Add/remove/toggle custom URL. Sync snapshot
+ (chunks + manifest) each time, 15s/source timeout.
 - **Upstream Catalog**: 16 upstreams (`src/upstream/catalog.ts`): Cloudflare
   1.1.1.1, Google, Quad9, AdGuard, Mullvad, Family, OpenDNS, DNS.SB... Failover
-  tuan tu, timeout 3s.
+  sequentially, timeout 3s.
 - **Dashboard** (`public/index.html`): metrics, DDoS panel, tabs
-  Upstream/Blocklist/Whitelist+Rewrite, logs 50 moi nhat, poll 4s.
-- **Bao mat**: PBKDF2-SHA256 100k + salt 16B · Session UUID TTL 7 ngay · Cookie
+  Upstream/Blocklist/Whitelist+Rewrite, logs 50, poll 4s.
+- **Bao mat**: PBKDF2-SHA256 100k + salt 16B · Session UUID TTL 7 days · Cookie
   HttpOnly SameSite=Strict + Bearer · DoH 60 req/s burst 120 · API 120 req/min ·
-  Login 5 sai khoa 15p · Sync cooldown 180s.
-- **Luu tru**: 100% Deno KV, khong DB ngoai. Counter `KvU64` + atomic sum.
+  Login 5 failed attempts 15 min · Sync cooldown 180s.
+- **Luu tru**: 100% Deno KV, no external DB. Counter `KvU64` + atomic sum.
 
 ```
 Client ── /dns-query (public) ──▶ Deno.serve (main.ts) ──▶ dns/auth/storage/ratelimit ──▶ Upstream DoH
@@ -41,16 +41,16 @@ deno task start   # http://localhost:8000
 deno task dev     # watch mode
 deno task test    # 47/47 test
 
-# Cong kiem tra bat buoc truoc PR (xem docs/CONTRIBUTING.md):
+# Required checks before PR (see docs/CONTRIBUTING.md):
 deno task check && deno task lint && deno task fmt --check && deno test
 deno task bench-hot-path   # benchmark hot path — p50 < 20ms, 0 KV op
-deno task migrate-kv       # xoa khoa KV legacy blocked_domains/* (manual)
+deno task migrate-kv       # Delete legacy KV key blocked_domains/* (manual)
 ```
 
-Thuc chat: `deno run --allow-net --allow-env --allow-read --unstable-kv main.ts`
+Implementation: `deno run --allow-net --allow-env --allow-read --unstable-kv main.ts`
 
-**Setup admin lan dau**: mo `http://localhost:8000` → nhap mat khau ≥ 6 ky tu
-(`POST /api/setup`) → nhan cookie `doh_session`. Hoac bo qua UI:
+**Initial admin setup**: open `http://localhost:8000` → enter password ≥ 6 characters
+(`POST /api/setup`) → receive `doh_session` cookie. Or via UI:
 
 ```bash
 ADMIN_PASSWORD="mat-khau-manh" deno task start
@@ -62,7 +62,7 @@ ADMIN_PASSWORD="mat-khau-manh" deno task start
 curl "http://localhost:8000/dns-query?name=example.com&type=A" -H "Accept: application/dns-json"
 ```
 
-Nut "⚡ Thu nghiem DoH" tren Dashboard la cach nhanh nhat.
+DoH Testing button on Dashboard is the fastest way.
 
 ## 3. Cau hinh client
 
@@ -72,24 +72,23 @@ Nut "⚡ Thu nghiem DoH" tren Dashboard la cach nhanh nhat.
   `https://<host>/dns-query`
 - **iOS 14+**: profile `.mobileconfig` voi
   `ServerURL = https://<host>/dns-query`
-- **Android**: dung app RethinkDNS/Nebulo voi Custom DoH endpoint (Private DNS
-  goc chi ho tro DoT)
+- **Android**: dung app RethinkDNS/Nebulo voi Custom DoH endpoint (Private DNS root only supports DoT)
 
 ## 4. Bien moi truong
 
 | Bien             | Mac dinh  | Mo ta                                                               |
 | ---------------- | --------- | ------------------------------------------------------------------- |
-| `ADMIN_PASSWORD` | trong     | Set → bo qua setup, login so sanh truc tiep. Dung cho Deploy/CI.    |
+| `ADMIN_PASSWORD` | trong     | Set → skip setup, login comparison directly. For Deploy/CI.    |
 | `DENO_KV_PATH`   | Deploy KV | Path KV local. VD: `DENO_KV_PATH=./data/kv.sqlite deno task start`. |
 | `PORT`           | `8000`    | `Deno.serve` tu doc khi deploy.                                     |
 
 ## 5. Deploy Deno Deploy
 
-1. Push repo len GitHub. 2. dash.deno.com → New Project → entry `main.ts`. 3.
-   Them env `ADMIN_PASSWORD`. 4. KV persistent mac dinh. DoH endpoint:
+1. Push repo to GitHub. 2. dash.deno.com → New Project → entry `main.ts`. 3.
+   Add env `ADMIN_PASSWORD`. 4. Default KV persistent. DoH endpoint:
    `https://<project>.deno.net/dns-query`.
 
-> Rate-limit in-memory → per-instance, khong global (trade-off chu y, xem
+> Rate-limit in-memory → per-instance, not global (trade-off note, see
 > ADR-2).
 
 ## 6. API cheat-sheet (admin can session Cookie/Bearer)
@@ -115,30 +114,30 @@ main.ts (init + dispatch) · deno.json (tasks, "unstable": ["kv"]) · public/ind
 main.ts ─▶ src/api/routes.ts + src/diag/diag.ts ─▶ src/storage.ts (facade + sync)
 src/
   types/ kv/ blocklist/ counters/ clientip/ ratelimit/ ssrf/ upstream/
-  auth/ dns/ api/ diag/ bench/        # chi tiet: docs/CONTRIBUTING.md §5
+  auth/ dns/ api/ diag/ bench/        # Details: docs/CONTRIBUTING.md §5
 ```
 
-- `upstream_dns_list.json` (39KB): catalog upstream tĩnh **thủ công** — CHƯA nối
-  vào code catalog; cơ hội bulk import khi cần (ARCHITECTURE §11).
+- `upstream_dns_list.json` (39KB): manual upstream catalog — not yet connected
+  into code catalog; bulk import opportunity when needed (ARCHITECTURE §11).
 - CI/CD: `.github/workflows/deno.yml` — lint · fmt · check · test · `deno audit`
   · deploy docs lên GitHub Pages.
 - **Preview PR** (plan §6.2): comment sticky `🚀 Preview` trên mỗi PR — trạng
-  thái build Deno Deploy + link console, cộng **Preview URL** khi đã thêm secret
-  `DENO_DEPLOY_TOKEN` (tùy chọn — `docs/CONTRIBUTING.md` §6); PR sửa `docs/`,
-  `README.md` hoặc `CHANGELOG.md` kèm artifact `docs-preview-pr-<n>`.
+  Deno Deploy build status + link console, with Preview URL when DENO_DEPLOY_TOKEN added
+  `DENO_DEPLOY_TOKEN` (optional — `docs/CONTRIBUTING.md` §6); PR edit `docs/`,
+  `README.md` or `CHANGELOG.md` with artifact `docs-preview-pr-<n>`.
 
 ## 8. Gioi han da biet
 
-- Rate-limit / logs / counters **in-memory per-instance** — không share giữa các
-  instance (multi-region cần KV atomic/Redis; xem ADR-2).
-- `upstream_dns_list.json` chưa import vào catalog (bulk import thủ công).
-- Key KV legacy `blocked_domains/*` còn sót trong data cũ →
+- Rate-limit / logs / counters **in-memory per-instance** — not share between
+  instance (multi-region requires KV atomic/Redis; see ADR-2).
+- `upstream_dns_list.json` not imported into catalog (manual bulk import).
+- Key KV legacy `blocked_domains/*` remaining in old data →
   `deno task migrate-kv`.
-- Tài liệu tiếng Việt — hạn chế với reviewer không đọc tiếng Việt.
+- Documentation in Vietnamese — limited to reviewers who read Vietnamese.
 
-Da giai quyet: sync snapshot thay the toan bo (khong con "chi them, khong xoa")
-· logs ring buffer in-memory (khong con ghi KV/request) · dashboard escape HTML
-(khong con XSS innerHTML) · SSRF guard URL custom · co test (47) + CI.
+Resolved: snapshot sync replaces whole (no add-only, no delete)
+· logs ring buffer in-memory (no KV write per request) · dashboard escape HTML
+(no XSS innerHTML) · SSRF guard URL custom · co test (47) + CI.
 
 ## 9. Ghi nhan
 

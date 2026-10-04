@@ -1,23 +1,16 @@
-# 🏗️ Thiết kế Kiến trúc — deno-dns
+# 🏗️ Architecture — deno-dns
 
-> Tài liệu kiến trúc hệ thống DNS-over-HTTPS serverless có lọc nội dung +
-> dashboard quản trị. Đối tượng: reviewer kiến trúc, người vận hành, contributor
-> mới. Tài liệu liên quan: [README](../README.md) ·
-> [Thiết kế phần mềm](SOFTWARE_DESIGN.md)
+> Architecture documentation for the DNS-over-HTTPS serverless with content filtering and administration dashboard. Target: architecture reviewers, operators, new contributors. Related: [README](../README.md) · [Software Design](SOFTWARE_DESIGN.md)
 
 ---
 
-## 1. Tổng quan hệ thống
+## 1. Overview
 
-**deno-dns** là một DoH server (RFC 8484) single-process chạy trên Deno, đóng
-vai trò **DNS forwarder có lọc**: nhận truy vấn DNS qua HTTPS, áp policy
-(whitelist → rewrite → blocklist), rồi forward tới upstream DoH công cộng. Kèm
-dashboard quản trị (`public/index.html`) và toàn bộ state lưu trong **Deno KV**.
+**deno-dns** is a DoH server (RFC 8484) single-process running on Deno, serving as a filtered DNS forwarder: receives DNS queries via HTTPS, applies policy (whitelist → rewrite → blocklist), then forwards to public upstream DoH. Administration dashboard (`public/index.html`) and all state in **Deno KV**.
 
-Mục tiêu phi chức năng chính: độ trễ thấp, triển khai 1 lệnh, không cần DB
-ngoài, chịu tải DDoS cơ bản ở tầng ứng dụng.
+Functional goals: low latency, single-command deployment, no external DB required, basic DDoS resistance at the application layer.
 
-## 2. Sơ đồ Context (C4 Level 1)
+## 2. Context Diagram (C4 Level 1)
 
 ```mermaid
 flowchart LR
@@ -26,68 +19,67 @@ flowchart LR
         R[Router / IoT]
         A[Admin browser]
     end
-    subgraph Ext["External"]
+    subgraph External["External"]
         U[Upstream DoH<br/>1.1.1.1, Google, Quad9...]
         S[Blocklist sources<br/>GitHub, oisd.nl...]
     end
-    SYS["deno-dns<br/>(Deno.serve + Deno KV)"]
-    B -- "DoH: GET/POST /dns-query" --> SYS
-    R -- "DoH" --> SYS
-    A -- "HTTPS: Dashboard + /api/*" --> SYS
-    SYS -- "forward dns-message (failover)" --> U
-    SYS -- "fetch blocklist (sync)" --> S
+    System["deno-dns<br/>(Deno.serve + Deno KV)"]
+    B -- "DoH: GET/POST /dns-query" --> System
+    R -- "DoH" --> System
+    A -- "HTTPS: Dashboard + /api/*" --> System
+    System -- "forward dns-message (failover)" --> U
+    System -- "fetch blocklist (sync)" --> S
 ```
 
-## 3. Sơ đồ Container (C4 Level 2)
+## 3. Container Diagram (C4 Level 2)
 
-Toàn bộ backend là **một tiến trình Deno duy nhất** (`main.ts` → `Deno.serve`).
-Không có worker, queue, hay DB rời.
+The entire backend is a single Deno process (`main.ts` → `Deno.serve`). No worker, queue, or external DB.
 
 ```mermaid
 flowchart TB
     AdminUI["Dashboard SPA<br/>public/index.html<br/>TailwindCDN + Vanilla JS"]
     Router["Router<br/>main.ts (Deno.serve)"]
     DNS["DoH pipeline<br/>src/dns.ts"]
-    AUTH["Auth<br/>src/auth.ts"]
-    STORE["Facade + sync<br/>src/storage.ts"]
+    Auth["Auth<br/>src/auth.ts"]
+    Store["Facade + sync<br/>src/storage.ts"]
     RL["Rate limiter<br/>src/ratelimit.ts (in-memory, LRU 100k)"]
     CAT["Catalog<br/>src/catalog.ts (constants)"]
     BLK["Blocklist store<br/>src/blocklist.ts (in-memory Set)"]
     UP["Upstream cache<br/>src/upstreams.ts (in-memory)"]
     CNT["Counters + ring log<br/>src/counters.ts (in-memory)"]
     CIP["Client IP trust<br/>src/clientip.ts"]
-    KV[("Deno KV<br/>persistent (snapshot, config, stats)")]
+    KV["("Deno KV<br/>persistent (snapshot, config, stats))"]
 
     AdminUI -- "/api/* (cookie/Bearer)" --> Router
-    Router --> DNS & AUTH & STORE & CIP
+    Router --> DNS & Auth & Store & CIP
     DNS --> RL & BLK & UP & CNT
-    STORE --> BLK & UP & CNT
-    STORE --> KV
-    AUTH --> KV
+    Store --> BLK & UP & CNT
+    Store --> KV
+    Auth --> KV
     BLK -. "poll 60s / sync" .-> KV
     UP -. "poll 60s" .-> KV
     CNT -. "flush 30s / SIGINT" .-> KV
 ```
 
-| Container       | Công nghệ                                | Trách nhiệm                                                                                                       |
-| --------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Router          | `Deno.serve`, `Request/Response` Web API | CORS preflight, định tuyến DoH vs API vs static, `GET /api/diag/headers` (verify header nền tảng)                 |
-| DoH pipeline    | `dns-packet@5.6.1`, `node:buffer`        | decode/encode gói DNS, policy 4 tầng (in-memory), failover upstream theo region node                              |
-| Client IP trust | `src/clientip.ts`                        | Chỉ tin header/remoteAddr của nền tảng; chống spoofing `x-forwarded-for`/`cf-connecting-ip`; cap bucket "unknown" |
-| Blocklist store | `src/blocklist.ts`                       | Set blocked/whitelist + Map rewrite in-memory; poll manifest 60s, build Set từ chunks, swap atomic                |
-| Upstream cache  | `src/upstreams.ts`                       | Catalog in-memory; sắp xếp upstream theo region node (`eu`/`us`/default), fallback 2 upstream                     |
-| Counters        | `src/counters.ts`                        | Counter in-memory + flush atomic gom (30s hoặc delta ≥ 10k, SIGINT); ring buffer log 50 entry/instance            |
-| KV facade       | `src/storage.ts`, `Deno.openKv()`        | CRUD admin (catalog/whitelist/rewrite), sync snapshot, merge stats KV + delta local                               |
-| Auth            | WebCrypto PBKDF2                         | hash/verify password, session UUID TTL 7 ngày                                                                     |
-| Rate limiter    | `LruMap` in-memory (cap 100k key)        | TokenBucket DoH/API, login lockout, sync cooldown — chặn memory-exhaustion bằng IP giả                            |
-| Dashboard       | Single HTML file, `fetch`                | CRUD catalog/rules, stats poll 4s (gồm `localDelta`), sync trigger, escape HTML khi render                        |
+| Container | Technology | Responsibilities |
+|-----------|------------|------------------|
+| Router | `Deno.serve`, `Request/Response` Web API | CORS preflight, routing DoH vs API vs static, `GET /api/diag/headers` (verify platform header) |
+| DoH pipeline | `dns-packet@5.6.1`, `node:buffer` | decode/encode DNS packets, 4-layer policy (in-memory), failover upstream by node region |
+| Client IP trust | `src/clientip.ts` | Only trust platform header remoteAddr; prevent spoofing `x-forwarded-for`/`cf-connecting-ip`; "unknown" bucket |
+| Blocklist store | `src/blocklist.ts` | In-memory set of blocked/whitelist + rewrite Map; poll manifest every 60s, build Set from chunks, atomic swap |
+| Upstream cache | `src/upstreams.ts` | In-memory catalog; sort upstream by node region (`eu`/`us`/default), fallback to 2 upstream |
+| Counters | `src/counters.ts` | In-memory counter + atomic flush batch (30s or delta ≥ 10k, SIGINT); ring buffer log 50 entries/instance |
+| KV facade | `src/storage.ts`, `Deno.openKv()` | CRUD admin (catalog/whitelist/rewrite), sync snapshot, merge KV stats + local delta |
+| Auth | WebCrypto PBKDF2 | password hash/verify, session UUID TTL 7 days |
+| Rate limiter | `LruMap` in-memory (cap 100k key) | TokenBucket DoH/API, login lockout, sync cooldown — prevent memory exhaustion with fake IP |
+| Dashboard | Single HTML file, `fetch` | CRUD catalog/rules, stats poll 4s (includes `localDelta`), sync trigger, escape HTML when rendering |
 
-## 4. Sơ đồ Component & Luồng dữ liệu
+## 4. Component & Data Flow
 
 ```mermaid
 flowchart TB
     REQ["HTTP Request"] --> CORS["OPTIONS? → 204"]
-    CORS --> DOH{"path = /dns-query<br/>hoặc / + ?dns/?name?"}
+    CORS --> DOH{"path = /dns-query<br/>or / + ?dns/?name?"}
     DOH -- yes --> D1["checkDohRateLimit (60/s)"]
     D1 --> D2["parse: POST raw / GET ?dns base64url / ?name JSON"]
     D2 --> D3["dnsPacket.decode → domain"]
@@ -98,19 +90,16 @@ flowchart TB
     P2 -- no --> P3{"isBlocked?"}
     P3 -- yes --> BLK["self-answer 0.0.0.0 / ::"]
     P3 -- no --> FWD
-    FWD --> UP["thử từng upstream (timeout 3s)"]
+    FWD --> UP["try each upstream (timeout 3s)"]
     DOH -- no --> API{"path /api/* ?"}
     API -- public --> AUTH2["auth-status/setup/login/logout"]
     API -- protected --> GATE["authenticateRequest"]
     GATE --> CRUD["stats/upstreams/blocklists/whitelist/rewrites/sync/change-password"]
 ```
 
-## 5. Sequence: truy van DoH
+## 5. Sequence: query DoH
 
-Hot path DoH chi chay **in-memory (0 op Deno KV)** — tra cuu Set/Map co san
-trong isolate, counter tang vao buffer local. KV chi duoc ghi boi 3 luu nen chu
-ky: poll snapshot (60s), flush counter (30s / delta / SIGINT), va sync
-blocklist.
+Hot path DoH runs **in-memory (0 Deno KV ops)** — lookup existing Set/Map
 
 ```mermaid
 sequenceDiagram
@@ -120,11 +109,11 @@ sequenceDiagram
     participant M as In-memory (Set/Map/counter)
     participant U as Upstream DoH
     C->>R: GET/POST /dns-query
-    R->>R: getClientInfo(req, info) — chi tin nen tang
+    R->>R: getClientInfo(req, info)
     R->>D: handleDNSQuery(req, info)
-    D->>D: checkDohRateLimit(ip) [429 neu het token]
-    D->>D: decode packet -> domain
-    D->>M: tra cuu whitelist / rewrite / blocklist (suffix-match, 0 KV)
+    D->>D: checkDohRateLimit(ip) [429 if out of tokens]
+    D->>D: decode packet → domain
+    D->>M: lookup whitelist / rewrite / blocklist (suffix-match, 0 KV)
     alt whitelisted
         D->>M: record WHITELISTED (buffer local)
         D->>U: forward
@@ -136,121 +125,89 @@ sequenceDiagram
         D-->>C: self-answer 0.0.0.0 / ::
     else allowed
         D->>M: record ALLOWED
-        D->>U: POST dns-message (lan luot theo region, timeout 3s)
+        D->>U: POST dns-message (round-robin among regions, timeout 3s)
         U-->>D: dns-message
-        D-->>C: 200 application/dns-message (hoac dns-json)
+        D-->>C: 200 application/dns-message (or dns-json)
     end
 ```
 
 ## 6. Sequence: sync blocklist → snapshot versioning
 
-Snapshot MVCC dùng `blocklist/manifest` để theo dõi version, mỗi version chunks
-~50KB newline-terminated. Sync ghi batch chặn 500 ops, sau đó atomic swap
-manifest. KV ops: 0 trên hot path; chỉ ghi bo snapshot (60s), flush counter (30s
-/ delta / SIGINT), và sync blocklist.
-
 ```mermaid
 sequenceDiagram
     participant A as Admin browser
-    participant R as Router
+    participant R as Router (main.ts)
     participant S as storage.ts (Facade + sync)
     participant M as manifest (Deno KV)
     participant C as Chunks (Deno KV)
     A->>R: POST /api/sync (Cookie)
     R->>R: authenticateRequest + sync cooldown 180s
     R->>S: syncBlocklists()
-    S->>S: fetch từng blocklist source (timeout 15s)
-    S->>S: parse 3 format, build Set in-memory
-    S->>M: atomic swap manifest ["blocklist","manifest"] (version ++)
-    S->>C: ghi chunks mới (blocklist/v/{version}/{i}, ~50KB newline-terminated)
+    R->>S: fetch each blocklist source (timeout 15s)
+    R->>S: parse 3 formats, build Set in-memory
+    R->>M: atomic swap manifest ["blocklist","manifest"] (version++)
+    R->>C: write new chunks (blocklist/v/{version}/i, ~50KB newline-terminated)
     S-->>A: {success, count, version}
 ```
 
-## 7. Mo hinh du lieu (Deno KV schema)
+## 7. Deno KV schema
 
-| Key pattern                               | Value                              | Ghi chu                                                                                                                                                                         |
-| ----------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `["config","upstreams_catalog"]`          | `UpstreamItem[]`                   | `{id,name,url,description,tag,tagLabel,enabled,isCustom?}`. Seed tu `DEFAULT_UPSTREAMS` (16 muc). Migration tu key cu `["config","upstreams"]: string[]` giu tuong thich nguoc. |
-| `["config","blocklists_catalog"]`         | `BlocklistItem[]`                  | `{id,name,url,description,category,categoryLabel,enabled,count?,isCustom?}`. Seed 6 muc, 3 muc bat mac dinh.                                                                    |
-| `["config","total_blocked_count"]`        | `number`                           | Tong domain dem duoc lan sync cuoi.                                                                                                                                             |
-| `["blocklist","manifest"]`                | `number`                           | Version hien tai. Chunks moi duoc ghi voi key `blocklist/v/{version}/{i}` (newline-terminated, ~50KB moi chunk). Lay luc truy van bang atomic swap.                             |
-| `["blocklist", "v", version, i]`          | `string[]`                         | Mỗi chunk la mang string domain duoc block (suffix-match). Index `i` tang tu 0.                                                                                                 |
-| `["whitelist", domain]`                   | `true`                             | Suffix-match giong blocklist (cho phep subdomain ke thua).                                                                                                                      |
-| `["rewrites", domain]`                    | `string (IP)`                      | Exact-match + wildcard `*.domain`. IPv4 tra cho query A, IPv6 cho AAAA.                                                                                                         |
-| `["stats","total"\|"blocked"\|"allowed"]` | `Deno.KvU64`                       | Tang bang `atomic().sum` theo dong luong (batch flush 30s hoặc delta ≥ 10k thay vì 1 request/1 increment).                                                                      |
-| `["auth","password_hash"]`                | `string salt:hash`                 | PBKDF2-SHA256 100k, salt 16B hex. Bi bypass khi co env `ADMIN_PASSWORD`.                                                                                                        |
-| `["sessions", uuid]`                      | `{expiresAt}` + `expireIn: 7 ngay` | KV tu xoa khi het han. Verify them lan nua o code.                                                                                                                              |
+| Key pattern | Value | Notes |
+|-------------|-------|-------|
+| `["config","upstreams_catalog"]` | `UpstreamItem[]` | `{id,name,url,description,tag,tagLabel,enabled,isCustom?}`. Seed from `DEFAULT_UPSTREAMS` (16 entries). Migration from old key `["config","upstreams"]: string[]` maintains backward compatibility. |
+| `["config","blocklists_catalog"]` | `BlocklistItem[]` | `{id,name,url,description,category,categoryLabel,enabled,count?,isCustom?}`. Seed 6 entries, 3 default. |
+| `["config","total_blocked_count"]` | `number` | Total domains blocked from last sync. |
+| `["blocklist","manifest"]` | `number` | Current version. Chunks written to `blocklist/v/{version}/i` (newline-terminated, ~50KB each). Read via atomic swap. |
+| `["blocklist", "v", version, i]` | `string[]` | Each chunk is an array of strings blocked (suffix-match). Index `i` starts at 0. |
+| `["whitelist", domain]` | `true` | Suffix-match allows subdomain inheritance. |
+| `["rewrites", domain]` | `string (IP)` | Exact-match + wildcard `*.domain`. IPv4 for A query, IPv6 for AAAA. |
+| `["stats","total"\|"blocked"\|"allowed"]` | `Deno.KvU64` | Increment via `atomic().sum` batch (every 30s or delta ≥ 10k instead of 1 request/1 increment). |
+| `["auth","password_hash"]` | `string salt:hash` | PBKDF2-SHA256 100k, 16B hex salt. Bypassed when `ADMIN_PASSWORD` env is set. |
+| `["sessions", uuid]` | `{expiresAt}` + `expireIn: 7 days` | KV removes when expired. Re-verify on subsequent access. |
 
-## 8. Quyet dinh kien truc (ADR)
+## 8. Architecture ADRs
 
-**ADR-1: Deno KV thay SQLite/Postgres.** Ly do: Deploy zero-config, persistent
-san tren Deno Deploy, API atomic sum phu hop counter. Danh doi: khong query phuc
-tap, list full-table kem khi log lon.
+### ADR-1: Deno KV replaces SQLite/Postgres
 
-**ADR-2: Rate-limit in-memory thay vi KV.** Ly do: check TokenBucket moi query
-DNS can do tre ~0ms; ghi KV moi request se chiu phi latency + cost. Danh doi:
-per-instance (multi-region khong share), mat khi restart. Chap nhan vi muc tieu
-la giam tai co hoi, khong phai gioi han thanh toan chuan xac.
+Reason: Deploy zero-config, persistent on Deno Deploy, API atomic sum matches counter. Note: no full-table queries when logs are large.
 
-**ADR-3: Failover tuan tu thay vi race song song.** Ly do: don gian, tranh tao
-song amplify toi upstream. Timeout 3s/upstream. Cai tien tuong lai: race 2 nhanh
-nhat + health score.
+### ADR-2: Rate-limit in-memory instead of KV
 
-**ADR-4: Single HTML dashboard thay SPA framework.** Ly do: 1 file, khong build
-step, deploy copy-paste. Danh doi: kho bao tri khi >1000 dong, khong component
-hoa.
+Reason: check TokenBucket on every query DNS can complete in ~0ms; writing KV on every request introduces latency + cost. Note: per-instance (multi-region not shared), lost on restart. Acceptable because reducing cost at risk of failure is not a standard guarantee.
 
-**ADR-5: Suffix-match o application thay vi regex engine.** Ly do: tra cuu KV
-O(labels) chinh xac, tranh ReDoS, de hieu.
+### ADR-3: Failover sequential instead of parallel
 
-**ADR-6: In-memory snapshot + 0-KV hot path.** Lý do: Cùng cấp tốc độ qua
-in-memory Set/Map (0 op Deno KV cho query DNS), đồng thời Deno KV vẫn dùng cho
-state dài hạn (catalog, whitelist, blocked_domains manifest). Danh đối: cần đồng
-bộ snapshot (60s) giữ cho KV và bộ nhớ in-memory nhất quán.
+Reason: simple, prevent amplification to upstream. 3s timeout per upstream. Future improvement: fastest 2 + health score.
 
-**ADR-7: Trọng tin client IP từ nền tảng.** Lý do: Bỏ qua `x-forwarded-for`,
-`x-real-ip`, `cf-connecting-ip` do client gửi; dùng `x-denoforwarded-for`
-(header nền tảng `PLATFORM_CLIENT_IP_HEADER`) theo sau là
-`info.remoteAddr.hostname`. Từ chối private/loopback địa chỉ từ header. Danh
-đối: chống spoofing IP giả.
+### ADR-4: Single HTML dashboard instead of SPA framework
 
-| Moi de doa         | Bien phap hien co                                                                                 | Con thieu                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| DDoS/Query flood   | TokenBucket 60 req/s burst 120 + 429 + Retry-After + metrics                                      | Chua co block IP vinh vien, chua co PoW/captcha |
-| Brute-force admin  | 5 sai khoa 15p + PBKDF2 100k + session 7 ngay                                                     | Chua co 2FA/TOTP                                |
-| CSRF               | Cookie SameSite=Strict + ho tro Bearer cho API tool                                               | Cookie khong co __Host- prefix                  |
-| XSS via domain log | Da đc giải quyết — escaping HTML khi render logs                                                  | —                                               |
-| Upstream spoofing  | Da đc giữè — chi forward URL https trong catalog; block private IP                                | —                                               |
-| Abuse sync (SSRF)  | Da đc giữè — sync chi admin authenticated, cooldown 180s; URL validate scheme/host                | —                                               |
-| Client IP spoofing | Da đc giữè — chi tin x-denoforwarded-for + remoteAddr hostname; bác bỏ private/loopback từ header | —                                               |
-| Packet lon         | Gioi han 4096 bytes, tra 400                                                                      | —                                               |
+Reason: 1 file, no build step, deploy copy-paste. Note: hard to maintain when >1000 lines, no componentization.
 
-## 10. Yeu cau phi chuc nang (NFR)
+### ADR-5: Suffix-match in application instead of regex engine
 
-- **Hieu nang:** DoH p50 < 20ms boi cache bo trong-memory (0 op Deno KV cho
-  self-answer block/rewrite); forward upstream co cache upstream (Cache-Control
-  300s).
-- **San sang:** single instance; fallback upstream dam bao tra loi mien la con 1
-  upstream song. Mat rate-limit khi restart la chap nhan duoc.
-- **Mo rong:** stateless ngoai KV → scale ngang duoc toan bo hot path bang
-  in-memory (LRU 100k key). Neu can gioi han toan cuc: chuyen sang KV atomic
-  hoac Redis.
-- **Quan sat:** `/api/stats` tra counters +
-  `ddosMetrics {totalDohBlocked, totalLoginBlocked, totalSyncBlocked, activeTrackedIps}`.
-  Log khi decode fail / fetch list loi.
-- **Bao mat:** mat khau >= 6 ky tu (validation o API), hash PBKDF2, cookie
-  HttpOnly.
+Reason: accurate KV label lookup, avoid ReDoS, easy to understand.
 
-## 11. Han che & Cong no ky thuat
+### ADR-6: In-memory snapshot + 0-KV hot path
 
-1. Da đc giải quyết — sync hiện dùng snapshot (chunks + manifest), không thêm
-   domain vào `blocked_domains/*` trực tiếp.
-2. Da đc giải quyết — logs lưu trong bộ nhớ ring buffer (in-memory), không có
-   TTL, dọn dẹp qua cron.
-3. Da đc giải quyết — `components/`, `islands/`, `utils.ts`, `static/` là code
-   chết từ template Fresh — đã xóa.
-4. Còn lại — `upstream_dns_list.json` (39KB) chưa nội dung vào catalog — có thể
-   bulk import thủ công.
-5. Da đc giải quyết — `deno test` chạy xanh (toàn bộ test suite green).
-6. Da đc giải quyết — Dashboard render logs bằng escape HTML — không còn nguy cơ
-   XSS.
+Reason: Achieve speed via in-memory Set/Map (0 Deno KV ops for DNS query), while Deno KV still uses for long-term state (catalog, whitelist, blocked_domains manifest). Note: need consistent snapshot (every 60s) to keep KV and in-memory synchronized.
+
+### ADR-7: Client IP from platform
+
+Reason: Ignore `x-forwarded-for`, `x-real-ip`, `cf-connecting-ip` sent by client; use platform header `PLATFORM_CLIENT_IP_HEADER` followed by `info.remoteAddr.hostname`. Reject private/loopback addresses from header. Purpose: prevent IP spoofing.
+
+## 9. Non-Functional Requirements (NFR)
+
+- **Performance**: DoH p50 < 20ms with in-memory cache (0 Deno KV ops for self-answer block/rewrite); forward upstream with upstream Cache-Control 300s.
+- **Startup**: single instance; fallback upstream ensures at least 1 upstream responds. Lost rate-limit on restart is acceptable.
+- **Scalability**: stateless outside KV → can scale entire hot path with in-memory (LRU 100k key). If global limiting is needed: switch to KV atomic or Redis.
+- **Monitoring**: `/api/stats` returns counters + `ddosMetrics {totalDohBlocked, totalLoginBlocked, totalSyncBlocked, activeTrackedIps}`. Log on decode fail / fetch list errors.
+- **Security**: password >= 6 characters (API validation), PBKDF2 hash, HttpOnly cookie.
+
+## 10. Limits & Technology
+
+1. Resolved — sync now uses snapshot (chunks + manifest), no add to `blocked_domains/*` directly.
+2. Resolved — logs stored in ring buffer (in-memory), no TTL, cleanup via cron.
+3. Resolved — `components/`, `islands/`, `utils.ts`, `static/` are dead code from Fresh template — already removed.
+4. Remaining — `upstream_dns_list.json` (39KB) not yet in catalog; manual bulk import possible.
+5. Resolved — `deno test` passes (all tests green).
+6. Resolved — Dashboard renders logs with HTML escaping — no XSS risk.
