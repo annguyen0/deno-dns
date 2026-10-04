@@ -1,7 +1,8 @@
 import { Buffer } from "node:buffer";
 import dnsPacket from "dns-packet";
+import { checkDohRateLimit } from "./ratelimit.ts";
 import {
-  getConfig,
+  getActiveUpstreamUrls,
   getRewriteIP,
   isBlocked,
   isWhitelisted,
@@ -13,6 +14,9 @@ export const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
+
+// Giới hạn kích thước gói tin DNS RFC chuẩn
+const MAX_DNS_PACKET_BYTES = 4096;
 
 function decodeBase64Url(str: string): Buffer | null {
   try {
@@ -26,10 +30,7 @@ function decodeBase64Url(str: string): Buffer | null {
 }
 
 async function forwardToUpstream(rawQuery: Buffer): Promise<Response> {
-  const config = await getConfig();
-  const upstreams = config.upstreams.length > 0
-    ? config.upstreams
-    : ["https://1.1.1.1/dns-query", "https://dns.google/dns-query"];
+  const upstreams = await getActiveUpstreamUrls();
 
   for (const upstream of upstreams) {
     try {
@@ -40,6 +41,7 @@ async function forwardToUpstream(rawQuery: Buffer): Promise<Response> {
           "Accept": "application/dns-message",
         },
         body: rawQuery,
+        signal: AbortSignal.timeout(3000), // Timeout 3s tránh treo worker
       });
 
       if (res.ok) {
@@ -67,6 +69,26 @@ export async function handleDNSQuery(
 ): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const clientIp =
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    info?.remoteAddr?.hostname ||
+    "127.0.0.1";
+
+  // --- DDoS & Rate Limiting Check (Token Bucket 60 req/s, Burst 120) ---
+  const rateLimit = checkDohRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    return new Response("Too Many DNS Requests", {
+      status: 429,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/plain; charset=utf-8",
+        "Retry-After": String(rateLimit.retryAfter || 1),
+      },
+    });
   }
 
   const url = new URL(req.url);
@@ -115,12 +137,13 @@ export async function handleDNSQuery(
     });
   }
 
-  const clientIp =
-    req.headers.get("cf-connecting-ip") ||
-    req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-    info?.remoteAddr?.hostname ||
-    "127.0.0.1";
+  // --- Packet Size Sanity Check ---
+  if (rawQuery.length > MAX_DNS_PACKET_BYTES) {
+    return new Response("DNS Packet Too Large", {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
 
   let domain = "";
   let query: dnsPacket.Packet | null = null;
@@ -223,7 +246,7 @@ export async function handleDNSQuery(
       const decodedRes = dnsPacket.decode(Buffer.from(arrayBuf));
       return Response.json(decodedRes, { headers: corsHeaders });
     } catch {
-      // Fallback nếu không decode được
+      // Fallback
     }
   }
 

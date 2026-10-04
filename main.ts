@@ -1,16 +1,40 @@
+import {
+  authenticateRequest,
+  checkAdminPassword,
+  createSession,
+  deleteSession,
+  getSessionIdFromRequest,
+  isSetupNeeded,
+  setAdminPassword,
+} from "./src/auth.ts";
 import { corsHeaders, handleDNSQuery } from "./src/dns.ts";
 import {
+  checkApiRateLimit,
+  checkLoginRateLimit,
+  checkSyncRateLimit,
+  getRateLimitStats,
+  recordLoginFailure,
+  recordSyncTriggered,
+  resetLoginFailure,
+} from "./src/ratelimit.ts";
+import {
+  addCustomBlocklist,
+  addCustomUpstream,
   addWhitelist,
-  getConfig,
+  getBlocklistsCatalog,
   getRewrites,
   getStats,
+  getUpstreamsCatalog,
   getWhitelist,
   initStorage,
+  removeBlocklist,
   removeRewrite,
+  removeUpstream,
   removeWhitelist,
-  saveConfig,
   setRewrite,
   syncBlocklists,
+  toggleBlocklist,
+  toggleUpstream,
 } from "./src/storage.ts";
 
 await initStorage();
@@ -18,19 +42,29 @@ await initStorage();
 Deno.serve(async (req: Request, info: Deno.ServeHandlerInfo) => {
   const url = new URL(req.url);
 
-  // Xử lý CORS preflight
+  // Xử lý CORS preflight cho mọi route
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const jsonResponse = (data: unknown, status = 200) => {
+  const clientIp =
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    info?.remoteAddr?.hostname ||
+    "127.0.0.1";
+
+  const jsonResponse = (data: unknown, status = 200, extraHeaders: HeadersInit = {}) => {
     return Response.json(data, {
       status,
-      headers: corsHeaders,
+      headers: {
+        ...corsHeaders,
+        ...extraHeaders,
+      },
     });
   };
 
-  // 1. DoH DNS Endpoint
+  // 1. DoH DNS Endpoint (Public, có DDoS Rate Limiting riêng)
   if (
     url.pathname === "/dns-query" ||
     url.pathname === "/dns-query/" ||
@@ -42,53 +76,206 @@ Deno.serve(async (req: Request, info: Deno.ServeHandlerInfo) => {
     return handleDNSQuery(req, info);
   }
 
-  // 2. REST API Endpoints
-  if (url.pathname === "/api/stats") {
-    return jsonResponse(await getStats());
+  // Rate Limiting chung cho tất cả các request API (120 req/phút)
+  if (url.pathname.startsWith("/api/")) {
+    const apiLimit = checkApiRateLimit(clientIp);
+    if (!apiLimit.allowed) {
+      return jsonResponse(
+        { error: "Too Many Requests", retryAfter: apiLimit.retryAfter },
+        429,
+        { "Retry-After": String(apiLimit.retryAfter || 1) }
+      );
+    }
   }
 
-  if (url.pathname === "/api/config") {
-    if (req.method === "GET") return jsonResponse(await getConfig());
-    if (req.method === "POST") {
-      await saveConfig(await req.json());
+  // 2. Authentication Endpoints (Public)
+  if (url.pathname === "/api/auth-status" && req.method === "GET") {
+    const authenticated = await authenticateRequest(req);
+    const needsSetup = await isSetupNeeded();
+    return jsonResponse({ authenticated, needsSetup });
+  }
+
+  if (url.pathname === "/api/setup" && req.method === "POST") {
+    const needsSetup = await isSetupNeeded();
+    if (!needsSetup) {
+      return jsonResponse({ error: "Hệ thống đã có mật khẩu quản trị!" }, 400);
+    }
+    const { password } = await req.json();
+    if (!password || password.trim().length < 6) {
+      return jsonResponse({ error: "Mật khẩu phải có ít nhất 6 ký tự!" }, 400);
+    }
+    await setAdminPassword(password.trim());
+    const session = await createSession();
+    return jsonResponse(
+      { success: true, token: session.sessionId },
+      200,
+      {
+        "Set-Cookie": `doh_session=${session.sessionId}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`,
+      }
+    );
+  }
+
+  if (url.pathname === "/api/login" && req.method === "POST") {
+    const loginLimit = checkLoginRateLimit(clientIp);
+    if (!loginLimit.allowed) {
+      return jsonResponse(
+        {
+          error: `Quá nhiều lần đăng nhập sai. Vui lòng thử lại sau ${loginLimit.retryAfter} giây!`,
+        },
+        429,
+        { "Retry-After": String(loginLimit.retryAfter || 60) }
+      );
+    }
+
+    const { password } = await req.json();
+    const isValid = await checkAdminPassword(password || "");
+    if (!isValid) {
+      recordLoginFailure(clientIp);
+      return jsonResponse({ error: "Mật khẩu không chính xác!" }, 401);
+    }
+
+    resetLoginFailure(clientIp);
+    const session = await createSession();
+    return jsonResponse(
+      { success: true, token: session.sessionId },
+      200,
+      {
+        "Set-Cookie": `doh_session=${session.sessionId}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800`,
+      }
+    );
+  }
+
+  if (url.pathname === "/api/logout" && req.method === "POST") {
+    const sessionId = getSessionIdFromRequest(req);
+    await deleteSession(sessionId);
+    return jsonResponse(
+      { success: true },
+      200,
+      {
+        "Set-Cookie": `doh_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`,
+      }
+    );
+  }
+
+  // 3. Protected Admin API Endpoints (Bắt buộc xác thực)
+  if (url.pathname.startsWith("/api/")) {
+    const isAuthenticated = await authenticateRequest(req);
+    if (!isAuthenticated) {
+      return jsonResponse({ error: "Unauthorized. Vui lòng đăng nhập!" }, 401);
+    }
+
+    // Stats & DDoS Metrics
+    if (url.pathname === "/api/stats") {
+      const stats = await getStats();
+      const ddosMetrics = getRateLimitStats();
+      return jsonResponse({ ...stats, ddosMetrics });
+    }
+
+    // Upstream Catalog
+    if (url.pathname === "/api/upstreams") {
+      if (req.method === "GET") return jsonResponse(await getUpstreamsCatalog());
+      if (req.method === "POST") {
+        const { name, url: upstreamUrl } = await req.json();
+        const created = await addCustomUpstream(name, upstreamUrl);
+        return jsonResponse({ success: true, item: created });
+      }
+      if (req.method === "DELETE") {
+        const { id } = await req.json();
+        await removeUpstream(id);
+        return jsonResponse({ success: true });
+      }
+    }
+
+    if (url.pathname === "/api/upstreams/toggle" && req.method === "POST") {
+      const { id, enabled } = await req.json();
+      await toggleUpstream(id, Boolean(enabled));
+      return jsonResponse({ success: true });
+    }
+
+    // Blocklist Catalog
+    if (url.pathname === "/api/blocklists") {
+      if (req.method === "GET") return jsonResponse(await getBlocklistsCatalog());
+      if (req.method === "POST") {
+        const { name, url: listUrl } = await req.json();
+        const created = await addCustomBlocklist(name, listUrl);
+        return jsonResponse({ success: true, item: created });
+      }
+      if (req.method === "DELETE") {
+        const { id } = await req.json();
+        await removeBlocklist(id);
+        return jsonResponse({ success: true });
+      }
+    }
+
+    if (url.pathname === "/api/blocklists/toggle" && req.method === "POST") {
+      const { id, enabled } = await req.json();
+      await toggleBlocklist(id, Boolean(enabled));
+      return jsonResponse({ success: true });
+    }
+
+    // Whitelist
+    if (url.pathname === "/api/whitelist") {
+      if (req.method === "GET") return jsonResponse(await getWhitelist());
+      if (req.method === "POST") {
+        const { domain } = await req.json();
+        await addWhitelist(domain);
+        return jsonResponse({ success: true });
+      }
+      if (req.method === "DELETE") {
+        const { domain } = await req.json();
+        await removeWhitelist(domain);
+        return jsonResponse({ success: true });
+      }
+    }
+
+    // Local DNS Rewrites
+    if (url.pathname === "/api/rewrites") {
+      if (req.method === "GET") return jsonResponse(await getRewrites());
+      if (req.method === "POST") {
+        const { domain, ip } = await req.json();
+        await setRewrite(domain, ip);
+        return jsonResponse({ success: true });
+      }
+      if (req.method === "DELETE") {
+        const { domain } = await req.json();
+        await removeRewrite(domain);
+        return jsonResponse({ success: true });
+      }
+    }
+
+    // Blocklist Sync (Có Rate Limiting Cooldown 3 phút)
+    if (url.pathname === "/api/sync" && req.method === "POST") {
+      const syncLimit = checkSyncRateLimit();
+      if (!syncLimit.allowed) {
+        return jsonResponse(
+          {
+            error: `Đang trong thời gian chờ giãn cách đồng bộ. Vui lòng thử lại sau ${syncLimit.retryAfter} giây!`,
+          },
+          429,
+          { "Retry-After": String(syncLimit.retryAfter || 60) }
+        );
+      }
+      recordSyncTriggered();
+      const count = await syncBlocklists();
+      return jsonResponse({ success: true, count });
+    }
+
+    // Change Admin Password
+    if (url.pathname === "/api/change-password" && req.method === "POST") {
+      const { currentPassword, newPassword } = await req.json();
+      const isValid = await checkAdminPassword(currentPassword || "");
+      if (!isValid) {
+        return jsonResponse({ error: "Mật khẩu hiện tại không đúng!" }, 400);
+      }
+      if (!newPassword || newPassword.trim().length < 6) {
+        return jsonResponse({ error: "Mật khẩu mới phải có ít nhất 6 ký tự!" }, 400);
+      }
+      await setAdminPassword(newPassword.trim());
       return jsonResponse({ success: true });
     }
   }
 
-  if (url.pathname === "/api/whitelist") {
-    if (req.method === "GET") return jsonResponse(await getWhitelist());
-    if (req.method === "POST") {
-      const { domain } = await req.json();
-      await addWhitelist(domain);
-      return jsonResponse({ success: true });
-    }
-    if (req.method === "DELETE") {
-      const { domain } = await req.json();
-      await removeWhitelist(domain);
-      return jsonResponse({ success: true });
-    }
-  }
-
-  if (url.pathname === "/api/rewrites") {
-    if (req.method === "GET") return jsonResponse(await getRewrites());
-    if (req.method === "POST") {
-      const { domain, ip } = await req.json();
-      await setRewrite(domain, ip);
-      return jsonResponse({ success: true });
-    }
-    if (req.method === "DELETE") {
-      const { domain } = await req.json();
-      await removeRewrite(domain);
-      return jsonResponse({ success: true });
-    }
-  }
-
-  if (url.pathname === "/api/sync" && req.method === "POST") {
-    const count = await syncBlocklists();
-    return jsonResponse({ success: true, count });
-  }
-
-  // 3. Phục vụ Web UI Dashboard (Đọc từ tệp public/index.html)
+  // 4. Phục vụ Web UI Dashboard (Đọc từ tệp public/index.html)
   try {
     const html = await Deno.readTextFile("./public/index.html");
     return new Response(html, {

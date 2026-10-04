@@ -1,9 +1,11 @@
-const kv = await Deno.openKv();
+import {
+  BlocklistItem,
+  DEFAULT_BLOCKLISTS,
+  DEFAULT_UPSTREAMS,
+  UpstreamItem,
+} from "./catalog.ts";
 
-export interface DNSConfig {
-  upstreams: string[];
-  blocklists: string[];
-}
+const kv = await Deno.openKv();
 
 export interface CustomRewrite {
   domain: string;
@@ -12,22 +14,44 @@ export interface CustomRewrite {
 
 // Khởi tạo dữ liệu mặc định
 export async function initStorage() {
-  const upstreams = await kv.get(["config", "upstreams"]);
-  if (!upstreams.value) {
-    await kv.set(["config", "upstreams"], [
-      "https://1.1.1.1/dns-query",
-      "https://dns.google/dns-query",
-    ]);
+  // 1. Khởi tạo danh mục Upstream tuyển chọn
+  const upstreamsEntry = await kv.get<UpstreamItem[]>(["config", "upstreams_catalog"]);
+  if (!upstreamsEntry.value) {
+    // Nếu có config cũ dạng string[], chuyển đổi sang cấu trúc mới
+    const oldUpstreams = await kv.get<string[]>(["config", "upstreams"]);
+    if (oldUpstreams.value && Array.isArray(oldUpstreams.value)) {
+      const merged = DEFAULT_UPSTREAMS.map((u) => ({
+        ...u,
+        enabled: oldUpstreams.value.includes(u.url),
+      }));
+      // Thêm các custom upstream cũ nếu có
+      for (const oldUrl of oldUpstreams.value) {
+        if (!DEFAULT_UPSTREAMS.some((u) => u.url === oldUrl)) {
+          merged.push({
+            id: "custom-" + crypto.randomUUID().slice(0, 8),
+            name: "Custom Upstream",
+            url: oldUrl,
+            description: "Máy chủ DNS tùy chỉnh của bạn",
+            tag: "custom",
+            tagLabel: "⚙️ Tùy chỉnh",
+            enabled: true,
+            isCustom: true,
+          });
+        }
+      }
+      await kv.set(["config", "upstreams_catalog"], merged);
+    } else {
+      await kv.set(["config", "upstreams_catalog"], DEFAULT_UPSTREAMS);
+    }
   }
 
-  const blocklists = await kv.get(["config", "blocklists"]);
-  if (!blocklists.value) {
-    await kv.set(["config", "blocklists"], [
-      "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-    ]);
+  // 2. Khởi tạo danh mục Blocklist tuyển chọn
+  const blocklistsEntry = await kv.get<BlocklistItem[]>(["config", "blocklists_catalog"]);
+  if (!blocklistsEntry.value) {
+    await kv.set(["config", "blocklists_catalog"], DEFAULT_BLOCKLISTS);
   }
 
-  // Khởi tạo và đồng bộ hóa các bộ đếm thống kê đảm bảo kiểu Deno.KvU64
+  // 3. Khởi tạo và đồng bộ hóa các bộ đếm thống kê đảm bảo kiểu Deno.KvU64
   for (const key of ["total", "blocked", "allowed"]) {
     const entry = await kv.get(["stats", key]);
     if (!entry.value || !(entry.value instanceof Deno.KvU64)) {
@@ -105,16 +129,91 @@ export async function getStats() {
   return { total, blocked, allowed, domainCount, logs };
 }
 
-// Config Upstreams & Blocklist URLs
-export async function getConfig(): Promise<DNSConfig> {
-  const upstreams = (await kv.get<string[]>(["config", "upstreams"])).value || [];
-  const blocklists = (await kv.get<string[]>(["config", "blocklists"])).value || [];
-  return { upstreams, blocklists };
+// --- Upstream Catalog APIs ---
+
+export async function getUpstreamsCatalog(): Promise<UpstreamItem[]> {
+  const entry = await kv.get<UpstreamItem[]>(["config", "upstreams_catalog"]);
+  return entry.value || DEFAULT_UPSTREAMS;
 }
 
-export async function saveConfig(config: DNSConfig) {
-  if (config.upstreams) await kv.set(["config", "upstreams"], config.upstreams);
-  if (config.blocklists) await kv.set(["config", "blocklists"], config.blocklists);
+export async function getActiveUpstreamUrls(): Promise<string[]> {
+  const catalog = await getUpstreamsCatalog();
+  const active = catalog.filter((u) => u.enabled).map((u) => u.url);
+  if (active.length === 0) {
+    return ["https://1.1.1.1/dns-query", "https://dns.google/dns-query"];
+  }
+  return active;
+}
+
+export async function toggleUpstream(id: string, enabled: boolean): Promise<void> {
+  const catalog = await getUpstreamsCatalog();
+  const updated = catalog.map((u) => (u.id === id ? { ...u, enabled } : u));
+  await kv.set(["config", "upstreams_catalog"], updated);
+}
+
+export async function addCustomUpstream(name: string, url: string): Promise<UpstreamItem> {
+  const catalog = await getUpstreamsCatalog();
+  const newItem: UpstreamItem = {
+    id: "custom-" + crypto.randomUUID().slice(0, 8),
+    name: name.trim() || "Custom Upstream",
+    url: url.trim(),
+    description: "Máy chủ DoH tùy chỉnh",
+    tag: "custom",
+    tagLabel: "⚙️ Tùy chỉnh",
+    enabled: true,
+    isCustom: true,
+  };
+  catalog.push(newItem);
+  await kv.set(["config", "upstreams_catalog"], catalog);
+  return newItem;
+}
+
+export async function removeUpstream(id: string): Promise<void> {
+  const catalog = await getUpstreamsCatalog();
+  const updated = catalog.filter((u) => u.id !== id);
+  await kv.set(["config", "upstreams_catalog"], updated);
+}
+
+// --- Blocklist Catalog APIs ---
+
+export async function getBlocklistsCatalog(): Promise<BlocklistItem[]> {
+  const entry = await kv.get<BlocklistItem[]>(["config", "blocklists_catalog"]);
+  return entry.value || DEFAULT_BLOCKLISTS;
+}
+
+export async function getActiveBlocklists(): Promise<BlocklistItem[]> {
+  const catalog = await getBlocklistsCatalog();
+  return catalog.filter((b) => b.enabled);
+}
+
+export async function toggleBlocklist(id: string, enabled: boolean): Promise<void> {
+  const catalog = await getBlocklistsCatalog();
+  const updated = catalog.map((b) => (b.id === id ? { ...b, enabled } : b));
+  await kv.set(["config", "blocklists_catalog"], updated);
+}
+
+export async function addCustomBlocklist(name: string, url: string): Promise<BlocklistItem> {
+  const catalog = await getBlocklistsCatalog();
+  const newItem: BlocklistItem = {
+    id: "custom-" + crypto.randomUUID().slice(0, 8),
+    name: name.trim() || "Custom Blocklist",
+    url: url.trim(),
+    description: "Nguồn danh sách chặn tùy chỉnh",
+    category: "custom",
+    categoryLabel: "⚙️ Tùy chỉnh",
+    enabled: true,
+    count: 0,
+    isCustom: true,
+  };
+  catalog.push(newItem);
+  await kv.set(["config", "blocklists_catalog"], catalog);
+  return newItem;
+}
+
+export async function removeBlocklist(id: string): Promise<void> {
+  const catalog = await getBlocklistsCatalog();
+  const updated = catalog.filter((b) => b.id !== id);
+  await kv.set(["config", "blocklists_catalog"], updated);
 }
 
 // Whitelist
@@ -166,11 +265,9 @@ export async function removeRewrite(domain: string) {
 export async function getRewriteIP(domain: string): Promise<string | null> {
   const clean = domain.toLowerCase().trim().replace(/\.$/, "");
   if (!clean) return null;
-  // Khớp chính xác
   const res = await kv.get<string>(["rewrites", clean]);
   if (res.value) return res.value;
 
-  // Khớp wildcard (*.domain)
   const parts = clean.split(".");
   for (let i = 1; i < parts.length - 1; i++) {
     const wildcard = "*." + parts.slice(i).join(".");
@@ -193,43 +290,87 @@ export async function isBlocked(domain: string): Promise<boolean> {
   return false;
 }
 
-export async function syncBlocklists(): Promise<number> {
-  const config = await getConfig();
-  let totalDomains = 0;
+// Helper trích xuất domain từ dòng (hỗ trợ hosts file, plain domain, adblock format)
+function extractDomainFromLine(rawLine: string): string | null {
+  let line = rawLine.trim();
+  if (!line || line.startsWith("#") || line.startsWith("!")) return null;
 
-  for (const url of config.blocklists) {
+  // Xóa comment cuối dòng
+  const hashIdx = line.indexOf("#");
+  if (hashIdx !== -1) line = line.substring(0, hashIdx).trim();
+
+  // Dạng Adblock rule: ||example.com^
+  if (line.startsWith("||") && line.includes("^")) {
+    const matched = line.match(/^\|\|([a-zA-Z0-9.-]+)\^/);
+    if (matched) return matched[1].toLowerCase().replace(/\.$/, "");
+  }
+
+  // Dạng hosts: 0.0.0.0 example.com hoặc 127.0.0.1 example.com
+  const parts = line.split(/\s+/);
+  if (parts.length >= 2) {
+    const domain = parts[1].toLowerCase().replace(/\.$/, "");
+    if (domain !== "localhost" && domain !== "broadcasthost" && domain.includes(".")) {
+      return domain;
+    }
+  }
+
+  // Dạng plain domain: example.com
+  if (parts.length === 1 && line.includes(".") && !line.includes("/")) {
+    return line.toLowerCase().replace(/\.$/, "");
+  }
+
+  return null;
+}
+
+export async function syncBlocklists(): Promise<number> {
+  const catalog = await getBlocklistsCatalog();
+  const activeLists = catalog.filter((b) => b.enabled);
+  let totalUniqueDomains = 0;
+
+  for (const list of catalog) {
+    if (!list.enabled) {
+      list.count = 0;
+      continue;
+    }
+
     try {
-      const response = await fetch(url);
+      const response = await fetch(list.url, {
+        signal: AbortSignal.timeout(15_000), // Timeout 15s cho mỗi nguồn
+      });
       if (!response.ok) continue;
+
       const text = await response.text();
       let atomic = kv.atomic();
       let batchCount = 0;
+      let listCount = 0;
 
       for (const line of text.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const parts = trimmed.split(/\s+/);
-        if (parts.length >= 2 && parts[1] !== "localhost") {
-          const domain = parts[1].toLowerCase().trim().replace(/\.$/, "");
-          if (domain) {
-            atomic.set(["blocked_domains", domain], true);
-            totalDomains++;
-            batchCount++;
-            if (batchCount >= 500) {
-              await atomic.commit();
-              atomic = kv.atomic();
-              batchCount = 0;
-            }
+        const domain = extractDomainFromLine(line);
+        if (domain) {
+          atomic.set(["blocked_domains", domain], true);
+          listCount++;
+          totalUniqueDomains++;
+          batchCount++;
+
+          if (batchCount >= 500) {
+            await atomic.commit();
+            atomic = kv.atomic();
+            batchCount = 0;
           }
         }
       }
+
       if (batchCount > 0) {
         await atomic.commit();
       }
+
+      list.count = listCount;
     } catch (e) {
-      console.error(`Lỗi tải blocklist từ ${url}:`, e);
+      console.error(`Lỗi tải blocklist từ "${list.name}" (${list.url}):`, e);
     }
   }
-  await kv.set(["config", "total_blocked_count"], totalDomains);
-  return totalDomains;
+
+  await kv.set(["config", "blocklists_catalog"], catalog);
+  await kv.set(["config", "total_blocked_count"], totalUniqueDomains);
+  return totalUniqueDomains;
 }

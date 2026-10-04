@@ -3,217 +3,717 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DNS Serverless Control Center</title>
+  <title>DNS Serverless Control Center | NextDNS & AdGuard Style</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom switch toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: .25s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .25s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #0284c7;
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans antialiased">
   <div class="max-w-6xl mx-auto space-y-6">
-    
+
     <!-- Header -->
     <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-800 gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-sky-400">⚡ Serverless DoH Dashboard</h1>
-        <p class="text-slate-400 text-sm mt-1">Endpoint: <code class="bg-slate-800 text-sky-300 px-2 py-1 rounded" id="dohUrl">/dns-query</code></p>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold text-sky-400 flex items-center gap-2">
+            <span>🛡️ DoH Control Center</span>
+          </h1>
+          <span id="authBadge" class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full font-medium hidden">
+            ● Đã xác thực
+          </span>
+          <span class="text-xs bg-sky-500/20 text-sky-400 border border-sky-500/40 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+            <span>⚡ DDoS Shield Bật</span>
+          </span>
+        </div>
+        <p class="text-slate-400 text-sm mt-1 flex items-center gap-2 flex-wrap">
+          <span>Endpoint:</span>
+          <code class="bg-slate-900 border border-slate-800 text-sky-300 px-2 py-0.5 rounded text-xs select-all font-mono" id="dohUrl">/dns-query</code>
+          <button onclick="copyDohUrl()" class="text-xs text-sky-400 hover:text-sky-300 underline">Sao chép</button>
+        </p>
       </div>
-      <div class="flex items-center gap-3">
-        <button onclick="testQuery()" class="bg-sky-600 hover:bg-sky-500 text-white font-medium px-4 py-2 rounded-lg transition text-sm flex items-center justify-center gap-2">
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="testQuery()" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 font-medium px-3.5 py-2 rounded-lg transition text-xs flex items-center gap-1.5 shadow-sm">
           <span>⚡ Thử nghiệm DoH</span>
         </button>
-        <button onclick="syncBlocklists()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition text-sm flex items-center justify-center gap-2">
-          <span>🔄 Đồng bộ Blocklist</span>
+        <button onclick="syncBlocklists()" id="btnSync" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-3.5 py-2 rounded-lg transition text-xs flex items-center gap-1.5 shadow-sm">
+          <span>🔄 Đồng bộ Blocklists</span>
+        </button>
+        <button onclick="logout()" id="btnLogout" class="bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-medium px-3.5 py-2 rounded-lg transition text-xs flex items-center gap-1.5 hidden shadow-sm">
+          <span>Đăng xuất</span>
         </button>
       </div>
     </header>
 
     <!-- Metrics Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
-        <span class="text-xs font-semibold text-slate-400">TỔNG REQUEST</span>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800/80 shadow-sm">
+        <span class="text-[11px] font-semibold text-slate-400 tracking-wider">TỔNG REQUEST</span>
         <p class="text-2xl font-bold mt-1 text-white" id="stTotal">0</p>
       </div>
-      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
-        <span class="text-xs font-semibold text-slate-400">ĐÃ CHẶN</span>
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800/80 shadow-sm">
+        <span class="text-[11px] font-semibold text-slate-400 tracking-wider">ĐÃ CHẶN</span>
         <p class="text-2xl font-bold mt-1 text-rose-400" id="stBlocked">0</p>
       </div>
-      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
-        <span class="text-xs font-semibold text-slate-400">CHO PHÉP</span>
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800/80 shadow-sm">
+        <span class="text-[11px] font-semibold text-slate-400 tracking-wider">CHO PHÉP</span>
         <p class="text-2xl font-bold mt-1 text-emerald-400" id="stAllowed">0</p>
       </div>
-      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
-        <span class="text-xs font-semibold text-slate-400">DOMAIN BLOCKLIST</span>
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800/80 shadow-sm">
+        <span class="text-[11px] font-semibold text-slate-400 tracking-wider">DOMAIN CHẶN</span>
         <p class="text-2xl font-bold mt-1 text-sky-400" id="stDomains">0</p>
+      </div>
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800/80 shadow-sm col-span-2 md:col-span-1">
+        <span class="text-[11px] font-semibold text-amber-400 tracking-wider flex items-center gap-1">
+          <span>🛡️ DDOS CHẶN</span>
+        </span>
+        <p class="text-2xl font-bold mt-1 text-amber-400" id="stDdosBlocked">0</p>
       </div>
     </div>
 
     <!-- Main Navigation Tabs -->
-    <div class="border-b border-slate-800 flex gap-4 text-sm font-medium">
-      <button onclick="switchTab('logs')" id="tab-logs" class="pb-3 border-b-2 border-sky-400 text-sky-400">Nhật Ký Truy Vấn</button>
-      <button onclick="switchTab('config')" id="tab-config" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Upstreams & Blocklists</button>
-      <button onclick="switchTab('rules')" id="tab-rules" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Whitelist & Local DNS</button>
+    <div class="border-b border-slate-800 flex gap-2 md:gap-6 text-sm font-medium overflow-x-auto">
+      <button onclick="switchTab('logs')" id="tab-logs" class="pb-3 border-b-2 border-sky-400 text-sky-400 whitespace-nowrap">
+        📋 Nhật Ký Truy Vấn
+      </button>
+      <button onclick="switchTab('upstreams')" id="tab-upstreams" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+        🌐 Upstream DNS
+      </button>
+      <button onclick="switchTab('blocklists')" id="tab-blocklists" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+        🛡️ Nguồn Blocklist
+      </button>
+      <button onclick="switchTab('rules')" id="tab-rules" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+        ✏️ Whitelist & Local DNS
+      </button>
+      <button onclick="switchTab('security')" id="tab-security" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap">
+        🔒 Bảo Mật & DDoS
+      </button>
     </div>
 
     <!-- Tab 1: Logs -->
-    <section id="sec-logs" class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
-      <h2 class="text-lg font-semibold mb-4 text-slate-200">Nhật Ký Truy Vấn Real-time</h2>
+    <section id="sec-logs" class="bg-slate-900/50 rounded-xl border border-slate-800/80 p-4 md:p-5 space-y-4">
+      <div class="flex flex-col md:flex-row justify-between md:items-center gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-200">Nhật Ký Truy Vấn Real-time</h2>
+          <p class="text-xs text-slate-400">Tự động cập nhật mỗi 4 giây qua SSE/Polling</p>
+        </div>
+        <input type="text" id="logFilter" oninput="filterLogs()" placeholder="🔍 Lọc domain, IP hoặc trạng thái..." class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 w-full md:w-64">
+      </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-          <thead class="text-slate-400 border-b border-slate-700/60">
+          <thead class="text-slate-400 border-b border-slate-800 text-xs">
             <tr>
-              <th class="pb-3">Thời gian</th>
-              <th class="pb-3">Domain</th>
-              <th class="pb-3">Trạng thái</th>
-              <th class="pb-3">Client IP</th>
+              <th class="pb-3 font-medium">Thời gian</th>
+              <th class="pb-3 font-medium">Domain</th>
+              <th class="pb-3 font-medium">Trạng thái</th>
+              <th class="pb-3 font-medium">Client IP</th>
             </tr>
           </thead>
-          <tbody id="logsTable" class="divide-y divide-slate-700/30"></tbody>
+          <tbody id="logsTable" class="divide-y divide-slate-800/40"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Tab 2: Upstreams & Blocklists -->
-    <section id="sec-config" class="hidden space-y-6">
-      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
-        <h3 class="font-semibold text-slate-200">🌐 Upstream DNS Servers</h3>
-        <div id="upstreamList" class="space-y-2"></div>
-        <div class="flex gap-2">
-          <input type="text" id="newUpstream" placeholder="https://1.1.1.1/dns-query" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500">
-          <button onclick="addUpstream()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm</button>
+    <!-- Tab 2: Upstreams Catalog (AdGuard Home / NextDNS style) -->
+    <section id="sec-upstreams" class="hidden space-y-6">
+      <div class="bg-slate-900/50 rounded-xl border border-slate-800/80 p-5 space-y-4">
+        <div class="flex flex-col md:flex-row justify-between md:items-center gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-200">🌐 Thư viện Upstream DNS Tuyển chọn</h2>
+            <p class="text-xs text-slate-400">Chọn 1 hoặc nhiều upstream servers để phân giải tên miền. Bật/tắt bằng 1 cú nhấp.</p>
+          </div>
         </div>
-      </div>
 
-      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
-        <h3 class="font-semibold text-slate-200">🛡️ Nguồn Blocklist (Hosts URLs)</h3>
-        <div id="blocklistList" class="space-y-2"></div>
-        <div class="flex gap-2">
-          <input type="text" id="newBlocklist" placeholder="https://domain.com/hosts.txt" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500">
-          <button onclick="addBlocklist()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm</button>
+        <div id="upstreamsCatalogGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Add Custom Upstream Form -->
+        <div class="pt-4 border-t border-slate-800/80 space-y-3">
+          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Thêm máy chủ DoH tùy chỉnh</h4>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input type="text" id="newUpstreamName" placeholder="Tên máy chủ (ví dụ: NextDNS Riêng)" class="w-full sm:w-56 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 text-slate-200">
+            <input type="text" id="newUpstreamUrl" placeholder="https://dns.nextdns.io/xxxxxx" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 text-slate-200">
+            <button onclick="addCustomUpstream()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition shadow-sm whitespace-nowrap">
+              + Thêm Server
+            </button>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Tab 3: Whitelist & Local DNS Rewrites -->
+    <!-- Tab 3: Blocklists Catalog (NextDNS / AdGuard Home style) -->
+    <section id="sec-blocklists" class="hidden space-y-6">
+      <div class="bg-slate-900/50 rounded-xl border border-slate-800/80 p-5 space-y-4">
+        <div class="flex flex-col md:flex-row justify-between md:items-center gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-200">🛡️ Danh mục Nguồn Blocklist</h2>
+            <p class="text-xs text-slate-400">Tích hợp các bộ lọc hàng đầu: bảo vệ người dùng Việt Nam, chặn quảng cáo, tracking và lừa đảo.</p>
+          </div>
+          <button onclick="syncBlocklists()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 self-start md:self-auto">
+            <span>🔄 Đồng bộ tất cả nguồn</span>
+          </button>
+        </div>
+
+        <div id="blocklistsCatalogGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Add Custom Blocklist Form -->
+        <div class="pt-4 border-t border-slate-800/80 space-y-3">
+          <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Thêm nguồn Blocklist tùy chỉnh</h4>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input type="text" id="newBlocklistName" placeholder="Tên nguồn (ví dụ: Chống Scam cá nhân)" class="w-full sm:w-56 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 text-slate-200">
+            <input type="text" id="newBlocklistUrl" placeholder="https://raw.githubusercontent.com/.../hosts" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 text-slate-200">
+            <button onclick="addCustomBlocklist()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition shadow-sm whitespace-nowrap">
+              + Thêm Nguồn
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Whitelist & Local DNS Rewrites -->
     <section id="sec-rules" class="hidden space-y-6">
       <!-- Whitelist -->
-      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
-        <h3 class="font-semibold text-emerald-400">✅ Whitelist (Bỏ qua Blocklist)</h3>
+      <div class="bg-slate-900/50 rounded-xl border border-slate-800/80 p-5 space-y-4">
+        <div>
+          <h3 class="font-semibold text-emerald-400 flex items-center gap-2">
+            <span>✅ Whitelist (Bỏ qua bộ lọc chặn)</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Tên miền được whitelist sẽ tự động áp dụng cho tất cả subdomains (ví dụ: whitelist <code>google.com</code> sẽ cho phép <code>mail.google.com</code>).</p>
+        </div>
         <div id="whitelistList" class="space-y-2"></div>
         <div class="flex gap-2">
-          <input type="text" id="newWhitelist" placeholder="example.com" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
-          <button onclick="addWhitelist()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm Whitelist</button>
+          <input type="text" id="newWhitelist" placeholder="example.com" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 text-slate-200">
+          <button onclick="addWhitelist()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition shadow-sm">Thêm Whitelist</button>
         </div>
       </div>
 
       <!-- Local DNS Rewrites -->
-      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
-        <h3 class="font-semibold text-amber-400">📌 Local DNS Rewrites (Custom Records)</h3>
+      <div class="bg-slate-900/50 rounded-xl border border-slate-800/80 p-5 space-y-4">
+        <div>
+          <h3 class="font-semibold text-amber-400 flex items-center gap-2">
+            <span>📌 Local DNS Rewrites (Custom DNS Records)</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Điều hướng domain cục bộ về địa chỉ IP tùy chọn. Hỗ trợ cả Wildcard (ví dụ: <code>*.home.local</code>).</p>
+        </div>
         <div id="rewriteList" class="space-y-2"></div>
-        <div class="flex gap-2">
-          <input type="text" id="rwDomain" placeholder="myhome.local" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
-          <input type="text" id="rwIp" placeholder="192.168.1.100" class="w-48 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
-          <button onclick="addRewrite()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm Rule</button>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input type="text" id="rwDomain" placeholder="myhome.local hoặc *.home.local" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200">
+          <input type="text" id="rwIp" placeholder="192.168.1.100" class="w-full sm:w-48 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200">
+          <button onclick="addRewrite()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition shadow-sm">Thêm Quy Tắc</button>
         </div>
       </div>
     </section>
+
+    <!-- Tab 5: Security & DDoS Shield -->
+    <section id="sec-security" class="hidden space-y-6">
+      <!-- DDoS Shield Status -->
+      <div class="bg-slate-900/50 rounded-xl border border-slate-800/80 p-5 space-y-4">
+        <h3 class="font-semibold text-sky-400 flex items-center gap-2">
+          <span>⚡ Trạng thái Lá Chắn DDoS (In-Memory Shield)</span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800">
+            <span class="text-xs text-slate-400">DoH Flood Rate Limit</span>
+            <p class="text-base font-semibold mt-1 text-slate-200">60 req/s <span class="text-xs text-slate-500">(Burst 120)</span></p>
+            <p class="text-[11px] text-emerald-400 mt-1">✓ Token Bucket In-Memory</p>
+          </div>
+          <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800">
+            <span class="text-xs text-slate-400">Chống Brute-force Đăng nhập</span>
+            <p class="text-base font-semibold mt-1 text-slate-200">Tối đa 5 lần thử</p>
+            <p class="text-[11px] text-emerald-400 mt-1">✓ Khóa 15 phút khi vi phạm</p>
+          </div>
+          <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800">
+            <span class="text-xs text-slate-400">Giới hạn tải Blocklist</span>
+            <p class="text-base font-semibold mt-1 text-slate-200">3 phút cooldown</p>
+            <p class="text-[11px] text-emerald-400 mt-1">✓ Ngăn cạn kiệt tài nguyên</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Change Password -->
+      <div class="bg-slate-900/50 rounded-xl border border-slate-800/80 p-5 space-y-4">
+        <h3 class="font-semibold text-slate-200">🔐 Đổi Mật Khẩu Quản Trị</h3>
+        <div class="max-w-md space-y-3">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Mật khẩu hiện tại</label>
+            <input type="password" id="currentPass" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 text-slate-200">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Mật khẩu mới (tối thiểu 6 ký tự)</label>
+            <input type="password" id="newPass" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-500 text-slate-200">
+          </div>
+          <button onclick="changePassword()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition shadow-sm">
+            Cập nhật mật khẩu
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Modal Đăng nhập / Khởi tạo -->
+  <div id="authModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-xl flex items-center justify-center mx-auto text-xl mb-2">
+          🛡️
+        </div>
+        <h3 id="modalTitle" class="text-lg font-bold text-white">Đăng nhập Quản trị DoH</h3>
+        <p id="modalDesc" class="text-xs text-slate-400">Vui lòng nhập mật khẩu để quản lý bảng điều khiển</p>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label id="inputLabel" class="block text-xs font-medium text-slate-300 mb-1">Mật khẩu</label>
+          <input type="password" id="authPassword" onkeydown="if(event.key==='Enter') submitAuth()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500">
+        </div>
+        <div id="confirmGroup" class="hidden">
+          <label class="block text-xs font-medium text-slate-300 mb-1">Xác nhận mật khẩu</label>
+          <input type="password" id="authConfirmPassword" onkeydown="if(event.key==='Enter') submitAuth()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500">
+        </div>
+        <p id="authError" class="text-xs text-rose-400 hidden"></p>
+        <button onclick="submitAuth()" id="btnSubmitAuth" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-medium py-2.5 rounded-lg text-sm transition shadow-sm">
+          Đăng nhập
+        </button>
+      </div>
+    </div>
   </div>
 
   <script>
-    let currentConfig = { upstreams: [], blocklists: [] };
+    let isNeedsSetup = false;
+    let isAuthenticated = false;
+    let currentLogs = [];
+
     document.getElementById('dohUrl').innerText = window.location.origin + '/dns-query';
 
-    function switchTab(tab) {
-      ['logs', 'config', 'rules'].forEach(t => {
-        document.getElementById(`sec-${t}`).classList.add('hidden');
-        document.getElementById(`tab-${t}`).className = 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200';
-      });
-      document.getElementById(`sec-${tab}`).classList.remove('hidden');
-      document.getElementById(`tab-${tab}`).className = 'pb-3 border-b-2 border-sky-400 text-sky-400';
+    function copyDohUrl() {
+      const url = window.location.origin + '/dns-query';
+      navigator.clipboard.writeText(url);
+      alert("Đã sao chép DoH URL: " + url);
     }
 
-    async function loadData() {
+    function switchTab(tab) {
+      ['logs', 'upstreams', 'blocklists', 'rules', 'security'].forEach(t => {
+        const sec = document.getElementById(`sec-${t}`);
+        const tabBtn = document.getElementById(`tab-${t}`);
+        if (sec) sec.classList.add('hidden');
+        if (tabBtn) tabBtn.className = 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap';
+      });
+      const activeSec = document.getElementById(`sec-${tab}`);
+      const activeTab = document.getElementById(`tab-${tab}`);
+      if (activeSec) activeSec.classList.remove('hidden');
+      if (activeTab) activeTab.className = 'pb-3 border-b-2 border-sky-400 text-sky-400 whitespace-nowrap';
+    }
+
+    // --- Authentication Flow ---
+
+    async function checkAuth() {
       try {
-        // Load Stats & Logs
-        const resStats = await fetch('/api/stats');
-        const stats = await resStats.json();
-        document.getElementById('stTotal').innerText = stats.total ?? 0;
-        document.getElementById('stBlocked').innerText = stats.blocked ?? 0;
-        document.getElementById('stAllowed').innerText = stats.allowed ?? 0;
-        document.getElementById('stDomains').innerText = (stats.domainCount ?? 0).toLocaleString();
+        const res = await fetch('/api/auth-status');
+        const data = await res.json();
+        isAuthenticated = data.authenticated;
+        isNeedsSetup = data.needsSetup;
 
-        const tbody = document.getElementById('logsTable');
-        if (!stats.logs || stats.logs.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-500">Chưa có truy vấn nào được ghi nhận</td></tr>';
+        const authModal = document.getElementById('authModal');
+        const authBadge = document.getElementById('authBadge');
+        const btnLogout = document.getElementById('btnLogout');
+
+        if (isNeedsSetup) {
+          authModal.classList.remove('hidden');
+          document.getElementById('modalTitle').innerText = "Khởi tạo Mật khẩu Quản trị";
+          document.getElementById('modalDesc').innerText = "Hệ thống chưa có mật khẩu. Vui lòng đặt mật khẩu mới để bảo vệ Dashboard.";
+          document.getElementById('confirmGroup').classList.remove('hidden');
+          document.getElementById('btnSubmitAuth').innerText = "Lưu & Bắt đầu";
+          authBadge.classList.add('hidden');
+          btnLogout.classList.add('hidden');
+        } else if (!isAuthenticated) {
+          authModal.classList.remove('hidden');
+          document.getElementById('modalTitle').innerText = "Đăng nhập Quản trị DoH";
+          document.getElementById('modalDesc').innerText = "Nhập mật khẩu quản trị để truy cập cấu hình hệ thống.";
+          document.getElementById('confirmGroup').classList.add('hidden');
+          document.getElementById('btnSubmitAuth').innerText = "Đăng nhập";
+          authBadge.classList.add('hidden');
+          btnLogout.classList.add('hidden');
         } else {
-          tbody.innerHTML = stats.logs.map(l => {
-            let statusBadge = '<span class="text-emerald-400 font-medium">ALLOWED</span>';
-            if (l.status === 'BLOCKED') statusBadge = '<span class="text-rose-400 font-bold">BLOCKED</span>';
-            if (l.status === 'WHITELISTED') statusBadge = '<span class="text-emerald-300 font-bold">WHITELISTED</span>';
-            if (l.status === 'REWRITE') statusBadge = '<span class="text-amber-400 font-bold">REWRITE</span>';
-            
-            return `<tr class="hover:bg-slate-800/30">
-              <td class="py-2 text-slate-400 font-mono text-xs">${l.time || ''}</td>
-              <td class="font-medium text-slate-200">${l.domain || ''}</td>
-              <td>${statusBadge}</td>
-              <td class="text-slate-400 font-mono text-xs">${l.clientIp || ''}</td>
-            </tr>`;
-          }).join('');
+          authModal.classList.add('hidden');
+          authBadge.classList.remove('hidden');
+          btnLogout.classList.remove('hidden');
+          loadAllData();
         }
-
-        // Config
-        const resConfig = await fetch('/api/config');
-        currentConfig = await resConfig.json();
-        renderConfig();
-
-        // Whitelist & Rewrites
-        loadRules();
       } catch (err) {
-        console.error("Lỗi khi tải dữ liệu dashboard:", err);
+        console.error("Lỗi kiểm tra auth:", err);
       }
     }
 
-    function renderConfig() {
-      document.getElementById('upstreamList').innerHTML = (currentConfig.upstreams || []).map((u, i) => 
-        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span>${u}</span><button onclick="removeUpstream(${i})" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
-      ).join('');
+    async function submitAuth() {
+      const errEl = document.getElementById('authError');
+      errEl.classList.add('hidden');
+      const pass = document.getElementById('authPassword').value;
 
-      document.getElementById('blocklistList').innerHTML = (currentConfig.blocklists || []).map((b, i) => 
-        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span class="truncate max-w-md">${b}</span><button onclick="removeBlocklist(${i})" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
-      ).join('');
+      if (!pass || pass.length < 6) {
+        errEl.innerText = "Mật khẩu phải có ít nhất 6 ký tự!";
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      if (isNeedsSetup) {
+        const confirmPass = document.getElementById('authConfirmPassword').value;
+        if (pass !== confirmPass) {
+          errEl.innerText = "Mật khẩu xác nhận không khớp!";
+          errEl.classList.remove('hidden');
+          return;
+        }
+
+        const res = await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          checkAuth();
+        } else {
+          errEl.innerText = data.error || "Lỗi thiết lập mật khẩu!";
+          errEl.classList.remove('hidden');
+        }
+      } else {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          checkAuth();
+        } else {
+          errEl.innerText = data.error || "Mật khẩu không chính xác!";
+          errEl.classList.remove('hidden');
+        }
+      }
     }
+
+    async function logout() {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.reload();
+    }
+
+    async function changePassword() {
+      const currentPassword = document.getElementById('currentPass').value;
+      const newPassword = document.getElementById('newPass').value;
+      if (!currentPassword || !newPassword) {
+        alert("Vui lòng điền đủ mật khẩu hiện tại và mật khẩu mới!");
+        return;
+      }
+      const res = await fetch('/api/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("Đã cập nhật mật khẩu thành công!");
+        document.getElementById('currentPass').value = '';
+        document.getElementById('newPass').value = '';
+      } else {
+        alert("Lỗi: " + (data.error || "Không thể đổi mật khẩu"));
+      }
+    }
+
+    // --- Data Loading & Rendering ---
+
+    async function loadAllData() {
+      await loadStats();
+      await loadUpstreams();
+      await loadBlocklists();
+      await loadRules();
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (res.status === 401) {
+          checkAuth();
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('stTotal').innerText = data.total ?? 0;
+        document.getElementById('stBlocked').innerText = data.blocked ?? 0;
+        document.getElementById('stAllowed').innerText = data.allowed ?? 0;
+        document.getElementById('stDomains').innerText = (data.domainCount ?? 0).toLocaleString();
+        document.getElementById('stDdosBlocked').innerText = (data.ddosMetrics?.totalDohBlocked ?? 0).toLocaleString();
+
+        currentLogs = data.logs || [];
+        renderLogsTable(currentLogs);
+      } catch (err) {
+        console.error("Lỗi tải stats:", err);
+      }
+    }
+
+    function renderLogsTable(logs) {
+      const tbody = document.getElementById('logsTable');
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-500">Chưa có truy vấn nào được ghi nhận</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        let statusBadge = '<span class="text-emerald-400 font-medium">ALLOWED</span>';
+        if (l.status === 'BLOCKED') statusBadge = '<span class="text-rose-400 font-bold">BLOCKED</span>';
+        if (l.status === 'WHITELISTED') statusBadge = '<span class="text-teal-300 font-bold">WHITELISTED</span>';
+        if (l.status === 'REWRITE') statusBadge = '<span class="text-amber-400 font-bold">REWRITE</span>';
+
+        return `<tr class="hover:bg-slate-800/30">
+          <td class="py-2.5 text-slate-400 font-mono text-xs whitespace-nowrap">${l.time || ''}</td>
+          <td class="font-medium text-slate-200 break-all">${l.domain || ''}</td>
+          <td>${statusBadge}</td>
+          <td class="text-slate-400 font-mono text-xs whitespace-nowrap">${l.clientIp || ''}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function filterLogs() {
+      const q = document.getElementById('logFilter').value.toLowerCase().trim();
+      if (!q) {
+        renderLogsTable(currentLogs);
+        return;
+      }
+      const filtered = currentLogs.filter(l => 
+        (l.domain && l.domain.toLowerCase().includes(q)) ||
+        (l.status && l.status.toLowerCase().includes(q)) ||
+        (l.clientIp && l.clientIp.toLowerCase().includes(q))
+      );
+      renderLogsTable(filtered);
+    }
+
+    // --- Upstreams Management ---
+
+    async function loadUpstreams() {
+      try {
+        const res = await fetch('/api/upstreams');
+        if (!res.ok) return;
+        const catalog = await res.json();
+        const container = document.getElementById('upstreamsCatalogGrid');
+
+        container.innerHTML = catalog.map(u => {
+          let badgeColor = "bg-slate-800 text-slate-300 border-slate-700";
+          if (u.tag === "speed") badgeColor = "bg-sky-500/10 text-sky-400 border-sky-500/30";
+          if (u.tag === "security") badgeColor = "bg-indigo-500/10 text-indigo-400 border-indigo-500/30";
+          if (u.tag === "adblock") badgeColor = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+          if (u.tag === "family") badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+
+          return `
+            <div class="bg-slate-950 p-4 rounded-xl border ${u.enabled ? 'border-sky-500/40 bg-sky-950/10' : 'border-slate-800'} transition flex flex-col justify-between gap-3">
+              <div>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <h3 class="font-semibold text-slate-200 text-sm">${u.name}</h3>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full border font-medium ${badgeColor}">${u.tagLabel || u.tag}</span>
+                  </div>
+                  <label class="switch flex-shrink-0">
+                    <input type="checkbox" ${u.enabled ? 'checked' : ''} onchange="toggleUpstream('${u.id}', this.checked)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">${u.description || ''}</p>
+                <code class="text-[11px] text-sky-300 font-mono mt-2 block break-all">${u.url}</code>
+              </div>
+              ${u.isCustom ? `
+                <div class="text-right pt-2 border-t border-slate-800/60">
+                  <button onclick="removeUpstream('${u.id}')" class="text-xs text-rose-400 hover:text-rose-300">Xóa server này</button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error("Lỗi tải upstreams:", err);
+      }
+    }
+
+    async function toggleUpstream(id, enabled) {
+      await fetch('/api/upstreams/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, enabled }),
+      });
+      loadUpstreams();
+    }
+
+    async function addCustomUpstream() {
+      const name = document.getElementById('newUpstreamName').value.trim();
+      const url = document.getElementById('newUpstreamUrl').value.trim();
+      if (!url) {
+        alert("Vui lòng nhập DoH URL của upstream!");
+        return;
+      }
+      await fetch('/api/upstreams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name || "Custom Upstream", url }),
+      });
+      document.getElementById('newUpstreamName').value = '';
+      document.getElementById('newUpstreamUrl').value = '';
+      loadUpstreams();
+    }
+
+    async function removeUpstream(id) {
+      if (!confirm("Bạn có chắc chắn muốn xóa máy chủ này?")) return;
+      await fetch('/api/upstreams', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      loadUpstreams();
+    }
+
+    // --- Blocklists Management ---
+
+    async function loadBlocklists() {
+      try {
+        const res = await fetch('/api/blocklists');
+        if (!res.ok) return;
+        const catalog = await res.json();
+        const container = document.getElementById('blocklistsCatalogGrid');
+
+        container.innerHTML = catalog.map(b => {
+          let badgeColor = "bg-slate-800 text-slate-300 border-slate-700";
+          if (b.category === "vn") badgeColor = "bg-amber-500/10 text-amber-400 border-amber-500/30";
+          if (b.category === "privacy") badgeColor = "bg-sky-500/10 text-sky-400 border-sky-500/30";
+          if (b.category === "general") badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+          if (b.category === "malware") badgeColor = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+
+          return `
+            <div class="bg-slate-950 p-4 rounded-xl border ${b.enabled ? 'border-sky-500/40 bg-sky-950/10' : 'border-slate-800'} transition flex flex-col justify-between gap-3">
+              <div>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h3 class="font-semibold text-slate-200 text-sm">${b.name}</h3>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full border font-medium ${badgeColor}">${b.categoryLabel || b.category}</span>
+                    ${b.count ? `<span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">${b.count.toLocaleString()} domain</span>` : ''}
+                  </div>
+                  <label class="switch flex-shrink-0">
+                    <input type="checkbox" ${b.enabled ? 'checked' : ''} onchange="toggleBlocklist('${b.id}', this.checked)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">${b.description || ''}</p>
+                <code class="text-[11px] text-slate-500 font-mono mt-2 block truncate">${b.url}</code>
+              </div>
+              ${b.isCustom ? `
+                <div class="text-right pt-2 border-t border-slate-800/60">
+                  <button onclick="removeBlocklist('${b.id}')" class="text-xs text-rose-400 hover:text-rose-300">Xóa nguồn này</button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error("Lỗi tải blocklists:", err);
+      }
+    }
+
+    async function toggleBlocklist(id, enabled) {
+      await fetch('/api/blocklists/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, enabled }),
+      });
+      loadBlocklists();
+    }
+
+    async function addCustomBlocklist() {
+      const name = document.getElementById('newBlocklistName').value.trim();
+      const url = document.getElementById('newBlocklistUrl').value.trim();
+      if (!url) {
+        alert("Vui lòng nhập URL nguồn blocklist!");
+        return;
+      }
+      await fetch('/api/blocklists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name || "Custom Blocklist", url }),
+      });
+      document.getElementById('newBlocklistName').value = '';
+      document.getElementById('newBlocklistUrl').value = '';
+      loadBlocklists();
+    }
+
+    async function removeBlocklist(id) {
+      if (!confirm("Bạn có chắc chắn muốn xóa nguồn blocklist này?")) return;
+      await fetch('/api/blocklists', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      loadBlocklists();
+    }
+
+    // --- Whitelist & Rewrites ---
 
     async function loadRules() {
       try {
         const resW = await fetch('/api/whitelist');
         const whitelist = await resW.json();
         document.getElementById('whitelistList').innerHTML = (whitelist || []).map(d => 
-          `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span>${d}</span><button onclick="removeWhitelist('${d}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
-        ).join('');
+          `<div class="flex justify-between items-center bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 text-xs">
+            <span class="font-mono text-emerald-300">${d}</span>
+            <button onclick="removeWhitelist('${d}')" class="text-rose-400 hover:text-rose-300">Xóa</button>
+          </div>`
+        ).join('') || '<p class="text-xs text-slate-500 py-1">Chưa có tên miền nào trong whitelist.</p>';
 
         const resR = await fetch('/api/rewrites');
         const rewrites = await resR.json();
         document.getElementById('rewriteList').innerHTML = (rewrites || []).map(r => 
-          `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span><b>${r.domain}</b> ➔ ${r.ip}</span><button onclick="removeRewrite('${r.domain}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
-        ).join('');
+          `<div class="flex justify-between items-center bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 text-xs">
+            <span><b class="font-mono text-amber-300">${r.domain}</b> ➔ <code class="text-slate-300">${r.ip}</code></span>
+            <button onclick="removeRewrite('${r.domain}')" class="text-rose-400 hover:text-rose-300">Xóa</button>
+          </div>`
+        ).join('') || '<p class="text-xs text-slate-500 py-1">Chưa có quy tắc rewrite nào.</p>';
       } catch (err) {
-        console.error("Lỗi khi tải danh sách whitelist/rewrites:", err);
+        console.error("Lỗi tải rules:", err);
       }
     }
-
-    async function saveConfig() {
-      await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(currentConfig) });
-      renderConfig();
-    }
-
-    async function addUpstream() {
-      const val = document.getElementById('newUpstream').value.trim();
-      if(val) { currentConfig.upstreams.push(val); await saveConfig(); document.getElementById('newUpstream').value = ''; }
-    }
-    async function removeUpstream(i) { currentConfig.upstreams.splice(i, 1); await saveConfig(); }
-
-    async function addBlocklist() {
-      const val = document.getElementById('newBlocklist').value.trim();
-      if(val) { currentConfig.blocklists.push(val); await saveConfig(); document.getElementById('newBlocklist').value = ''; }
-    }
-    async function removeBlocklist(i) { currentConfig.blocklists.splice(i, 1); await saveConfig(); }
 
     async function addWhitelist() {
       const domain = document.getElementById('newWhitelist').value.trim();
@@ -223,6 +723,7 @@
         loadRules();
       }
     }
+
     async function removeWhitelist(domain) {
       await fetch('/api/whitelist', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
       loadRules();
@@ -233,21 +734,36 @@
       const ip = document.getElementById('rwIp').value.trim();
       if (domain && ip) {
         await fetch('/api/rewrites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, ip }) });
-        document.getElementById('rwDomain').value = ''; document.getElementById('rwIp').value = '';
+        document.getElementById('rwDomain').value = '';
+        document.getElementById('rwIp').value = '';
         loadRules();
       }
     }
+
     async function removeRewrite(domain) {
       await fetch('/api/rewrites', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
       loadRules();
     }
 
     async function syncBlocklists() {
-      alert("Đang bắt đầu đồng bộ dữ liệu blocklist...");
-      const res = await fetch('/api/sync', { method: 'POST' });
-      const data = await res.json();
-      alert(`Đã hoàn tất đồng bộ ${data.count.toLocaleString()} domain vào Deno KV!`);
-      loadData();
+      const btn = document.getElementById('btnSync');
+      btn.disabled = true;
+      btn.innerText = "⏳ Đang đồng bộ...";
+      try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`Đã hoàn tất đồng bộ ${data.count.toLocaleString()} domain vào Deno KV!`);
+          loadAllData();
+        } else {
+          alert(data.error || "Lỗi đồng bộ blocklists!");
+        }
+      } catch (err) {
+        alert("Lỗi kết nối đồng bộ: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🔄 Đồng bộ Blocklists";
+      }
     }
 
     async function testQuery() {
@@ -257,7 +773,7 @@
         const res = await fetch(`/dns-query?name=${encodeURIComponent(domain.trim())}`);
         if (res.ok) {
           alert(`Truy vấn DoH cho "${domain}" thành công! Kết quả đã được cập nhật lên Dashboard.`);
-          loadData();
+          loadStats();
         } else {
           alert(`Lỗi khi truy vấn DoH: HTTP ${res.status}`);
         }
@@ -266,8 +782,11 @@
       }
     }
 
-    loadData();
-    setInterval(loadData, 4000);
+    // Start App
+    checkAuth();
+    setInterval(() => {
+      if (isAuthenticated) loadStats();
+    }, 4000);
   </script>
 </body>
 </html>
