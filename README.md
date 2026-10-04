@@ -121,7 +121,8 @@ src/
 - `upstream_dns_list.json` (39KB): catalog upstream tĩnh **thủ công** — CHƯA nối
   vào code catalog; cơ hội bulk import khi cần (ARCHITECTURE §11).
 - CI/CD: `.github/workflows/deno.yml` — lint · fmt · check · test · `deno audit`
-  · deploy docs lên GitHub Pages.
+  · deploy docs lên GitHub Pages · **preview artifact + comment sticky trên PR**
+  khi docs thay đổi (plan §6.2).
 
 ## 8. Gioi han da biet
 

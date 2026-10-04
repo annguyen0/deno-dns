@@ -31,7 +31,8 @@ bản theo [Semantic Versioning](https://semver.org/lang/vi/).
 - **Test suite 47 test** qua 7 module (`*_test.ts` cạnh nguồn).
 - **CI/CD GitHub Actions** `.github/workflows/deno.yml`: lint · fmt · check ·
   test trên mỗi PR/push; quét bảo mật khóa phụ thuộc; deploy tài liệu lên GitHub
-  Pages.
+  Pages; PR sửa docs nhận **comment preview** (artifact `docs-preview-pr-<n>`,
+  plan §6.2).
 - Tài liệu: `docs/CONTRIBUTING.md`, `docs/CODE_OF_CONDUCT.md`, cấu trúc lại
   `docs/ARCHITECTURE.md` §1–§11 (tiếng Việt, C4 + ADR-1…ADR-7).
 

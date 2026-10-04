@@ -111,3 +111,111 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  docs-preview:
+    # Preview tai lieu cho PR (plan §6.2 "Deploy preview for PR branch"):
+    # upload artifact tu branch cua PR + sticky comment tren PR tro toi artifact do.
+    # Khong can build — Pages cung publish Markdown (docs/*.md, README, CHANGELOG).
+    name: Docs Preview (PR comment)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: docs-preview-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # can lich su day du de tinh merge-base voi base branch
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Detect changed docs vs base branch
+        id: docs
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF"
+          git diff --name-only "origin/${BASE_REF}...HEAD" -- docs/ README.md CHANGELOG.md > changed_docs.txt
+          if [ -s changed_docs.txt ]; then
+            echo "has_docs=true" >> "$GITHUB_OUTPUT"
+            echo "files=$(tr '\n' ',' < changed_docs.txt | sed 's/,$//')" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_docs=false" >> "$GITHUB_OUTPUT"
+            echo "files=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stage preview site
+        if: steps.docs.outputs.has_docs == 'true'
+        run: |
+          mkdir -p _site
+          cp docs/*.md README.md CHANGELOG.md _site/
+
+      - name: Upload preview artifact
+        if: steps.docs.outputs.has_docs == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-preview-pr-${{ github.event.number }}
+          path: _site
+          retention-days: 14
+
+      - name: Post / update sticky PR comment
+        # continue-on-error: PR tu fork co token read-only (khong comment duoc) — van giu job xanh
+        if: steps.docs.outputs.has_docs == 'true'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          DOCS_FILES: ${{ steps.docs.outputs.files }}
+          PR_NUMBER: ${{ github.event.number }}
+        with:
+          script: |
+            const marker = "<!-- deno-dns-docs-preview -->";
+            const files = (process.env.DOCS_FILES || "")
+              .split(",")
+              .filter((f) => f.trim().length > 0);
+            const runUrl =
+              `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}` +
+              `/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const sha = context.payload.pull_request.head.sha.slice(0, 7);
+            const body = [
+              marker,
+              `### 📄 Docs preview — \`${sha}\``,
+              "",
+              "Tài liệu trong PR này sẽ được deploy lên GitHub Pages khi merge vào `main`.",
+              "File docs thay đổi:",
+              ...files.map((f) => `- \`${f}\``),
+              "",
+              `📦 Tải bản preview: [workflow run](${runUrl}) → artifact ` +
+                `**\`docs-preview-pr-${process.env.PR_NUMBER}\`** (tải về, giải nén để xem).`,
+              "",
+              "_Comment này tự cập nhật khi bạn push commit mới sửa `docs/`, `README.md` " +
+                "hoặc `CHANGELOG.md`._",
+            ].join("\n");
+
+            const { owner, repo } = context.repo;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) =>
+              c.body && c.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

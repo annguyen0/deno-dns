@@ -90,6 +90,8 @@ src/
   `refactor(scope): ...`, `chore(scope): ...`
 - Mỗi PR phải giữ xanh: `check + lint + fmt + test` (CI chạy tự động
   `.github/workflows/deno.yml`)
+- PR sửa `docs/`, `README.md` hoặc `CHANGELOG.md` sẽ nhận **comment preview** tự
+  động (artifact `docs-preview-pr-<số>`, tải từ workflow run — plan §6.2)
 - Test mới: bọc IO/timer trong `try/finally` (dispose, restore fetch stub…); mỗi
   test tự reset singleton qua `resetKv()`/`resetCounters()` nếu cần
 - Không commit file môi trường (`.env`) hay dữ liệu KV
