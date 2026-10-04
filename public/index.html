@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DNS Serverless Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-800 gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-sky-400">⚡ Serverless DoH Dashboard</h1>
+        <p class="text-slate-400 text-sm mt-1">Endpoint: <code class="bg-slate-800 text-sky-300 px-2 py-1 rounded" id="dohUrl">/dns-query</code></p>
+      </div>
+      <button onclick="syncBlocklists()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition text-sm flex items-center justify-center gap-2">
+        <span>🔄 Đồng bộ Blocklist</span>
+      </button>
+    </header>
+
+    <!-- Metrics Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
+        <span class="text-xs font-semibold text-slate-400">TỔNG REQUEST</span>
+        <p class="text-2xl font-bold mt-1 text-white" id="stTotal">0</p>
+      </div>
+      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
+        <span class="text-xs font-semibold text-slate-400">ĐÃ CHẶN</span>
+        <p class="text-2xl font-bold mt-1 text-rose-400" id="stBlocked">0</p>
+      </div>
+      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
+        <span class="text-xs font-semibold text-slate-400">CHO PHÉP</span>
+        <p class="text-2xl font-bold mt-1 text-emerald-400" id="stAllowed">0</p>
+      </div>
+      <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50">
+        <span class="text-xs font-semibold text-slate-400">DOMAIN BLOCKLIST</span>
+        <p class="text-2xl font-bold mt-1 text-sky-400" id="stDomains">0</p>
+      </div>
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <div class="border-b border-slate-800 flex gap-4 text-sm font-medium">
+      <button onclick="switchTab('logs')" id="tab-logs" class="pb-3 border-b-2 border-sky-400 text-sky-400">Nhật Ký Truy Vấn</button>
+      <button onclick="switchTab('config')" id="tab-config" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Upstreams & Blocklists</button>
+      <button onclick="switchTab('rules')" id="tab-rules" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">Whitelist & Local DNS</button>
+    </div>
+
+    <!-- Tab 1: Logs -->
+    <section id="sec-logs" class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+      <h2 class="text-lg font-semibold mb-4 text-slate-200">Nhật Ký Truy Vấn Real-time</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="text-slate-400 border-b border-slate-700/60">
+            <tr>
+              <th class="pb-3">Thời gian</th>
+              <th class="pb-3">Domain</th>
+              <th class="pb-3">Trạng thái</th>
+              <th class="pb-3">Client IP</th>
+            </tr>
+          </thead>
+          <tbody id="logsTable" class="divide-y divide-slate-700/30"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Tab 2: Upstreams & Blocklists -->
+    <section id="sec-config" class="hidden space-y-6">
+      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
+        <h3 class="font-semibold text-slate-200">🌐 Upstream DNS Servers</h3>
+        <div id="upstreamList" class="space-y-2"></div>
+        <div class="flex gap-2">
+          <input type="text" id="newUpstream" placeholder="https://1.1.1.1/dns-query" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500">
+          <button onclick="addUpstream()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm</button>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
+        <h3 class="font-semibold text-slate-200">🛡️ Nguồn Blocklist (Hosts URLs)</h3>
+        <div id="blocklistList" class="space-y-2"></div>
+        <div class="flex gap-2">
+          <input type="text" id="newBlocklist" placeholder="https://domain.com/hosts.txt" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500">
+          <button onclick="addBlocklist()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Whitelist & Local DNS Rewrites -->
+    <section id="sec-rules" class="hidden space-y-6">
+      <!-- Whitelist -->
+      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
+        <h3 class="font-semibold text-emerald-400">✅ Whitelist (Bỏ qua Blocklist)</h3>
+        <div id="whitelistList" class="space-y-2"></div>
+        <div class="flex gap-2">
+          <input type="text" id="newWhitelist" placeholder="example.com" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+          <button onclick="addWhitelist()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm Whitelist</button>
+        </div>
+      </div>
+
+      <!-- Local DNS Rewrites -->
+      <div class="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5 space-y-4">
+        <h3 class="font-semibold text-amber-400">📌 Local DNS Rewrites (Custom Records)</h3>
+        <div id="rewriteList" class="space-y-2"></div>
+        <div class="flex gap-2">
+          <input type="text" id="rwDomain" placeholder="myhome.local" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+          <input type="text" id="rwIp" placeholder="192.168.1.100" class="w-48 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+          <button onclick="addRewrite()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Thêm Rule</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let currentConfig = { upstreams: [], blocklists: [] };
+    document.getElementById('dohUrl').innerText = window.location.origin + '/dns-query';
+
+    function switchTab(tab) {
+      ['logs', 'config', 'rules'].forEach(t => {
+        document.getElementById(`sec-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).className = 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200';
+      });
+      document.getElementById(`sec-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).className = 'pb-3 border-b-2 border-sky-400 text-sky-400';
+    }
+
+    async function loadData() {
+      // Load Stats & Logs
+      const resStats = await fetch('/api/stats');
+      const stats = await resStats.json();
+      document.getElementById('stTotal').innerText = stats.total;
+      document.getElementById('stBlocked').innerText = stats.blocked;
+      document.getElementById('stAllowed').innerText = stats.allowed;
+      document.getElementById('stDomains').innerText = stats.domainCount.toLocaleString();
+
+      const tbody = document.getElementById('logsTable');
+      tbody.innerHTML = stats.logs.map(l => {
+        let statusBadge = '<span class="text-emerald-400">ALLOWED</span>';
+        if (l.status === 'BLOCKED') statusBadge = '<span class="text-rose-400 font-bold">BLOCKED</span>';
+        if (l.status === 'WHITELISTED') statusBadge = '<span class="text-emerald-300 font-bold">WHITELISTED</span>';
+        if (l.status === 'REWRITE') statusBadge = '<span class="text-amber-400 font-bold">REWRITE</span>';
+        
+        return `<tr class="hover:bg-slate-800/30"><td class="py-2 text-slate-400">${l.time}</td><td class="font-medium text-slate-200">${l.domain}</td><td>${statusBadge}</td><td class="text-slate-400">${l.clientIp}</td></tr>`;
+      }).join('');
+
+      // Config
+      const resConfig = await fetch('/api/config');
+      currentConfig = await resConfig.json();
+      renderConfig();
+
+      // Whitelist & Rewrites
+      loadRules();
+    }
+
+    function renderConfig() {
+      document.getElementById('upstreamList').innerHTML = currentConfig.upstreams.map((u, i) => 
+        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span>${u}</span><button onclick="removeUpstream(${i})" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
+      ).join('');
+
+      document.getElementById('blocklistList').innerHTML = currentConfig.blocklists.map((b, i) => 
+        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span class="truncate max-w-md">${b}</span><button onclick="removeBlocklist(${i})" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
+      ).join('');
+    }
+
+    async function loadRules() {
+      const resW = await fetch('/api/whitelist');
+      const whitelist = await resW.json();
+      document.getElementById('whitelistList').innerHTML = whitelist.map(d => 
+        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span>${d}</span><button onclick="removeWhitelist('${d}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
+      ).join('');
+
+      const resR = await fetch('/api/rewrites');
+      const rewrites = await resR.json();
+      document.getElementById('rewriteList').innerHTML = rewrites.map(r => 
+        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span><b>${r.domain}</b> ➔ ${r.ip}</span><button onclick="removeRewrite('${r.domain}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
+      ).join('');
+    }
+
+    async function saveConfig() {
+      await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(currentConfig) });
+      renderConfig();
+    }
+
+    async function addUpstream() {
+      const val = document.getElementById('newUpstream').value.trim();
+      if(val) { currentConfig.upstreams.push(val); await saveConfig(); document.getElementById('newUpstream').value = ''; }
+    }
+    async function removeUpstream(i) { currentConfig.upstreams.splice(i, 1); await saveConfig(); }
+
+    async function addBlocklist() {
+      const val = document.getElementById('newBlocklist').value.trim();
+      if(val) { currentConfig.blocklists.push(val); await saveConfig(); document.getElementById('newBlocklist').value = ''; }
+    }
+    async function removeBlocklist(i) { currentConfig.blocklists.splice(i, 1); await saveConfig(); }
+
+    async function addWhitelist() {
+      const domain = document.getElementById('newWhitelist').value.trim();
+      if (domain) {
+        await fetch('/api/whitelist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
+        document.getElementById('newWhitelist').value = '';
+        loadRules();
+      }
+    }
+    async function removeWhitelist(domain) {
+      await fetch('/api/whitelist', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
+      loadRules();
+    }
+
+    async function addRewrite() {
+      const domain = document.getElementById('rwDomain').value.trim();
+      const ip = document.getElementById('rwIp').value.trim();
+      if (domain && ip) {
+        await fetch('/api/rewrites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, ip }) });
+        document.getElementById('rwDomain').value = ''; document.getElementById('rwIp').value = '';
+        loadRules();
+      }
+    }
+    async function removeRewrite(domain) {
+      await fetch('/api/rewrites', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
+      loadRules();
+    }
+
+    async function syncBlocklists() {
+      alert("Đang bắt đầu đồng bộ dữ liệu blocklist...");
+      const res = await fetch('/api/sync', { method: 'POST' });
+      const data = await res.json();
+      alert(`Đã hoàn tất đồng bộ ${data.count.toLocaleString()} domain vào Deno KV!`);
+      loadData();
+    }
+
+    loadData();
+    setInterval(loadData, 4000);
+  </script>
+</body>
+</html>

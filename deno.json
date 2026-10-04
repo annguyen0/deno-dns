@@ -1,10 +1,9 @@
 {
   "tasks": {
-    "start": "deno run --allow-net --allow-env main.ts"
+    "start": "deno run --allow-net --allow-env --allow-read main.ts"
   },
   "imports": {
-    "dns-packet": "npm:dns-packet@^5.6.1",
-    "@std/encoding": "jsr:@std/encoding@^1.0.5"
+    "dns-packet": "npm:dns-packet@^5.6.1"
   },
   "unstable": [
     "kv"
