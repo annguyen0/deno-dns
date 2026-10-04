@@ -64,31 +64,67 @@ async function syncBlocklists() {
   return totalDomains;
 }
 
-// Xử lý DNS over HTTPS (DoH RFC 8484)
+// Header CORS tiêu chuẩn cho DoH RFC 8484
+const corsHeaders = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type, accept",
+};
+
+// Giải mã Base64URL an toàn (tự động xử lý padding '=' chuẩn RFC 8484)
+function decodeBase64UrlSafe(str: string): Uint8Array | null {
+  try {
+    let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4 !== 0) {
+      base64 += "=";
+    }
+    const binStr = atob(base64);
+    const bytes = new Uint8Array(binStr.length);
+    for (let i = 0; i < binStr.length; i++) {
+      bytes[i] = binStr.charCodeAt(i);
+    }
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+// Xử lý DNS over HTTPS (DoH)
 async function handleDNSQuery(req: Request): Promise<Response> {
+  // 1. Phản hồi HTTP OPTIONS Preflight cho Trình duyệt
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   const url = new URL(req.url);
   let rawQuery: Uint8Array | null = null;
 
+  // 2. Lấy gói tin DNS từ GET hoặc POST
   if (req.method === "GET") {
     const dnsParam = url.searchParams.get("dns");
-    if (dnsParam) rawQuery = decodeBase64Url(dnsParam);
+    if (dnsParam) rawQuery = decodeBase64UrlSafe(dnsParam);
   } else if (req.method === "POST" && req.headers.get("content-type") === "application/dns-message") {
     rawQuery = new Uint8Array(await req.arrayBuffer());
   }
 
   if (!rawQuery) {
-    return new Response("Bad Request: Thiếu gói tin DNS", { status: 400 });
+    return new Response("Bad Request: Thiếu gói tin DNS", {
+      status: 400,
+      headers: corsHeaders,
+    });
   }
 
   try {
     const query = dnsPacket.decode(rawQuery);
     const question = query.questions?.[0];
-    if (!question) return new Response("Invalid Question", { status: 400 });
+    if (!question) {
+      return new Response("Invalid Question", { status: 400, headers: corsHeaders });
+    }
 
     const domain = question.name.toLowerCase().replace(/\.$/, "");
     const clientIp = req.headers.get("x-forwarded-for") || "Edge";
 
-    // 1. Kiểm tra Blocklist trong Deno KV
+    // 3. Kiểm tra Blocklist trong Deno KV
     const isBlocked = await kv.get(["blocked_domains", domain]);
     if (isBlocked.value) {
       await recordStat(domain, true, clientIp);
@@ -107,27 +143,41 @@ async function handleDNSQuery(req: Request): Promise<Response> {
 
       return new Response(blockedPacket, {
         status: 200,
-        headers: { "content-type": "application/dns-message", "cache-control": "public, max-age=300" },
+        headers: {
+          ...corsHeaders,
+          "content-type": "application/dns-message",
+          "cache-control": "public, max-age=300",
+        },
       });
     }
 
-    // 2. Chuyển tiếp tới Upstream DoH
+    // 4. Chuyển tiếp tới Upstream DoH
     await recordStat(domain, false, clientIp);
     const upstreams = (await kv.get<string[]>(["config", "upstreams"])).value || ["https://1.1.1.1/dns-query"];
 
     const upstreamRes = await fetch(upstreams[0], {
       method: "POST",
-      headers: { "content-type": "application/dns-message", "accept": "application/dns-message" },
+      headers: {
+        "content-type": "application/dns-message",
+        "accept": "application/dns-message",
+      },
       body: rawQuery,
     });
 
     const responseBuf = await upstreamRes.arrayBuffer();
     return new Response(responseBuf, {
       status: 200,
-      headers: { "content-type": "application/dns-message", "cache-control": "public, max-age=300" },
+      headers: {
+        ...corsHeaders,
+        "content-type": "application/dns-message",
+        "cache-control": "public, max-age=300",
+      },
     });
   } catch (err) {
-    return new Response(`DNS Processing Error: ${err}`, { status: 500 });
+    return new Response(`DNS Processing Error: ${err}`, {
+      status: 500,
+      headers: corsHeaders,
+    });
   }
 }
 
