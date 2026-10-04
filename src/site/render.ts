@@ -11,7 +11,7 @@
 //   raw .md copies of every source
 //   .nojekyll            skip Jekyll processing on GitHub Pages
 
-import { marked } from "npm:marked";
+import { marked } from "marked";
 
 const outDir = "_site";
 const docsDir = "docs";

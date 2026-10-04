@@ -17,7 +17,7 @@
   "imports": {
     "dns-packet": "npm:dns-packet@^5.6.1",
     "@std/assert": "jsr:@std/assert@^1.0.10",
-    "marked": "npm:marked"
+    "marked": "npm:marked@^18.0.0"
   },
   "lint": {
     "exclude": [
