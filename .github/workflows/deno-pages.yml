@@ -1,6 +1,6 @@
 # CI/CD cho deno-dns (plan §6.3 - GitHub Pages deployment).
 
-name: deno-dns CI/CD
+name: deno-dns · Pages
 
 on:
   push:
@@ -22,6 +22,8 @@ jobs:
     name: Publish Architecture Docs
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

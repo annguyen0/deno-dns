@@ -3,7 +3,7 @@
 # - job "lint-format-check" hop lech hop check, lint, fmt, test
 # - trigger: push, pull_request, workflow_dispatch
 
-name: deno-dns CI/CD
+name: deno-dns · Lint & Test
 
 on:
   push:

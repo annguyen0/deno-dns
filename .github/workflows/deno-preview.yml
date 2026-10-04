@@ -1,11 +1,10 @@
 # CI/CD cho deno-dns (plan §6.4 - PR preview).
 
-name: deno-dns CI/CD
+name: deno-dns · PR Preview
 
 on:
   pull_request:
     branches: [main]
-  workflow_dispatch: {}
 
 permissions:
   contents: read

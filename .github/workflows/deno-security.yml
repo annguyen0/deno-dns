@@ -1,6 +1,6 @@
 # CI/CD cho deno-dns (plan §6.2 - Security Scan).
 
-name: deno-dns CI/CD
+name: deno-dns · Security
 
 on:
   push:
@@ -12,10 +12,12 @@ on:
 permissions:
   contents: read
 
+env:
+  DENO_VERSION: "2.9.7"
+
 jobs:
   security-scan:
     name: Dependency Security Scan
-    needs: deno-lint.yml
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
