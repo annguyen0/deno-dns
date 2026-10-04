@@ -1,97 +1,90 @@
 import dnsPacket from "dns-packet";
-import { decodeBase64Url } from "@std/encoding/base64url";
 
-// Khởi tạo Deno KV Database ở tầng Edge
-const kv = await Deno.openKv();
-
-// Cấu hình ban đầu nếu KV trống
-const upstreams = await kv.get(["config", "upstreams"]);
-if (!upstreams.value) {
-  await kv.set(["config", "upstreams"], [
-    "https://1.1.1.1/dns-query",
-    "https://dns.google/dns-query",
-  ]);
-}
-
-const blocklists = await kv.get(["config", "blocklists"]);
-if (!blocklists.value) {
-  await kv.set(["config", "blocklists"], [
-    "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-  ]);
-}
-
-// Ghi nhận thống kê
-async function recordStat(domain: string, blocked: boolean, clientIp: string) {
-  const typeKey = blocked ? "blocked" : "allowed";
-  await kv.atomic()
-    .mutate({ type: "sum", key: ["stats", "total"], value: 1n })
-    .mutate({ type: "sum", key: ["stats", typeKey], value: 1n })
-    .commit();
-
-  await kv.set(["logs", Date.now()], {
-    id: crypto.randomUUID(),
-    time: new Date().toLocaleTimeString("vi-VN"),
-    domain,
-    blocked,
-    clientIp,
-  });
-}
-
-// Đồng bộ Blocklist từ các Nguồn URL về Deno KV
-async function syncBlocklists() {
-  const res = await kv.get<string[]>(["config", "blocklists"]);
-  const urls = res.value || [];
-  let totalDomains = 0;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      const text = await response.text();
-      for (const line of text.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const parts = trimmed.split(/\s+/);
-        if (parts.length >= 2 && parts[1] !== "localhost") {
-          await kv.set(["blocked_domains", parts[1].toLowerCase()], true);
-          totalDomains++;
-        }
-      }
-    } catch (e) {
-      console.error("Lỗi đồng bộ blocklist:", e);
-    }
-  }
-  await kv.set(["config", "total_blocked_count"], totalDomains);
-  return totalDomains;
-}
-
-// Header CORS tiêu chuẩn cho DoH RFC 8484
+// Headers CORS bắt buộc cho trình duyệt
 const corsHeaders = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, OPTIONS",
-  "access-control-allow-headers": "content-type, accept",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
-// Giải mã Base64URL an toàn (tự động xử lý padding '=' chuẩn RFC 8484)
+const kv = await Deno.openKv();
+
+// Giải mã Base64URL an toàn chuẩn RFC 8484
 function decodeBase64UrlSafe(str: string): Uint8Array | null {
   try {
     let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-    while (base64.length % 4 !== 0) {
-      base64 += "=";
-    }
+    while (base64.length % 4 !== 0) base64 += "=";
     const binStr = atob(base64);
     const bytes = new Uint8Array(binStr.length);
-    for (let i = 0; i < binStr.length; i++) {
-      bytes[i] = binStr.charCodeAt(i);
-    }
+    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
     return bytes;
   } catch {
     return null;
   }
 }
 
-// Xử lý DNS over HTTPS (DoH)
+// Ghi log & thống kê truy vấn
+async function recordStat(domain: string, blocked: boolean, clientIp: string) {
+  try {
+    const typeKey = blocked ? "blocked" : "allowed";
+    await kv.atomic()
+      .mutate({ type: "sum", key: ["stats", "total"], value: 1n })
+      .mutate({ type: "sum", key: ["stats", typeKey], value: 1n })
+      .commit();
+
+    await kv.set(["logs", Date.now()], {
+      id: crypto.randomUUID(),
+      time: new Date().toLocaleTimeString("vi-VN"),
+      domain,
+      blocked,
+      clientIp,
+    });
+  } catch (e) {
+    console.error("Lỗi ghi log:", e);
+  }
+}
+
+// Chuyển tiếp gói tin DNS thô tới Upstream DoH (Failover tự động)
+async function forwardToUpstream(rawQuery: Uint8Array): Promise<Response> {
+  const upstreams = [
+    "https://1.1.1.1/dns-query",
+    "https://dns.google/dns-query",
+    "https://dns.quad9.net/dns-query",
+  ];
+
+  for (const upstream of upstreams) {
+    try {
+      const res = await fetch(upstream, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/dns-message",
+          "Accept": "application/dns-message",
+        },
+        body: rawQuery,
+      });
+
+      if (res.ok) {
+        const body = await res.arrayBuffer();
+        return new Response(body, {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/dns-message",
+            "Cache-Control": "public, max-age=300",
+          },
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return new Response("Upstream DNS Error", { status: 502, headers: corsHeaders });
+}
+
+// Xử lý DoH Server
 async function handleDNSQuery(req: Request): Promise<Response> {
-  // 1. Phản hồi HTTP OPTIONS Preflight cho Trình duyệt
+  // 1. Phản hồi HTTP OPTIONS Preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -99,103 +92,91 @@ async function handleDNSQuery(req: Request): Promise<Response> {
   const url = new URL(req.url);
   let rawQuery: Uint8Array | null = null;
 
-  // 2. Lấy gói tin DNS từ GET hoặc POST
   if (req.method === "GET") {
     const dnsParam = url.searchParams.get("dns");
-    if (dnsParam) rawQuery = decodeBase64UrlSafe(dnsParam);
-  } else if (req.method === "POST" && req.headers.get("content-type") === "application/dns-message") {
-    rawQuery = new Uint8Array(await req.arrayBuffer());
+    if (dnsParam) {
+      rawQuery = decodeBase64UrlSafe(dnsParam);
+    } else {
+      // Phản hồi 200 OK cho các truy vấn Probe GET Ping không kèm tham số từ trình duyệt
+      return new Response("DoH Server Active", {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+  } else if (req.method === "POST") {
+    try {
+      rawQuery = new Uint8Array(await req.arrayBuffer());
+    } catch {
+      rawQuery = null;
+    }
   }
 
-  if (!rawQuery) {
-    return new Response("Bad Request: Thiếu gói tin DNS", {
-      status: 400,
-      headers: corsHeaders,
+  if (!rawQuery || rawQuery.length === 0) {
+    return new Response("DoH Server Active", {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
     });
   }
 
+  // 2. Thử Parse gói tin để kiểm tra Blocklist
+  let domain = "";
   try {
     const query = dnsPacket.decode(rawQuery);
     const question = query.questions?.[0];
-    if (!question) {
-      return new Response("Invalid Question", { status: 400, headers: corsHeaders });
+    if (question && question.name) {
+      domain = question.name.toLowerCase().replace(/\.$/, "");
+      const isBlocked = await kv.get(["blocked_domains", domain]);
+
+      if (isBlocked.value) {
+        const clientIp = req.headers.get("x-forwarded-for") || "Edge";
+        await recordStat(domain, true, clientIp);
+
+        const blockedPacket = dnsPacket.encode({
+          type: "response",
+          id: query.id,
+          flags: dnsPacket.AUTHORITATIVE_ANSWER,
+          questions: query.questions,
+          answers: [{
+            type: (question.type as "A" | "AAAA") || "A",
+            name: question.name,
+            ttl: 300,
+            data: "0.0.0.0",
+          }],
+        });
+
+        return new Response(blockedPacket, {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/dns-message",
+            "Cache-Control": "public, max-age=300",
+          },
+        });
+      }
     }
-
-    const domain = question.name.toLowerCase().replace(/\.$/, "");
-    const clientIp = req.headers.get("x-forwarded-for") || "Edge";
-
-    // 3. Kiểm tra Blocklist trong Deno KV
-    const isBlocked = await kv.get(["blocked_domains", domain]);
-    if (isBlocked.value) {
-      await recordStat(domain, true, clientIp);
-      const blockedPacket = dnsPacket.encode({
-        type: "response",
-        id: query.id,
-        flags: dnsPacket.AUTHORITATIVE_ANSWER,
-        questions: query.questions,
-        answers: [{
-          type: question.type as "A" | "AAAA",
-          name: question.name,
-          ttl: 300,
-          data: "0.0.0.0",
-        }],
-      });
-
-      return new Response(blockedPacket, {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "content-type": "application/dns-message",
-          "cache-control": "public, max-age=300",
-        },
-      });
-    }
-
-    // 4. Chuyển tiếp tới Upstream DoH
-    await recordStat(domain, false, clientIp);
-    const upstreams = (await kv.get<string[]>(["config", "upstreams"])).value || ["https://1.1.1.1/dns-query"];
-
-    const upstreamRes = await fetch(upstreams[0], {
-      method: "POST",
-      headers: {
-        "content-type": "application/dns-message",
-        "accept": "application/dns-message",
-      },
-      body: rawQuery,
-    });
-
-    const responseBuf = await upstreamRes.arrayBuffer();
-    return new Response(responseBuf, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "content-type": "application/dns-message",
-        "cache-control": "public, max-age=300",
-      },
-    });
-  } catch (err) {
-    return new Response(`DNS Processing Error: ${err}`, {
-      status: 500,
-      headers: corsHeaders,
-    });
+  } catch {
+    // Nếu gói tin probe nâng cao không parse được bằng dns-packet, passthrough thẳng lên Upstream
   }
+
+  // 3. Nếu không bị chặn (hoặc là gói tin probe thô), chuyển tiếp lên Upstream
+  const clientIp = req.headers.get("x-forwarded-for") || "Edge";
+  if (domain) await recordStat(domain, false, clientIp);
+
+  return await forwardToUpstream(rawQuery);
 }
 
-// HTTP Server chính xử lý cả DoH API lẫn Web Dashboard UI
+// Server chính vừa phục vụ Web UI vừa phục vụ DoH Endpoint
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
-  // Endpoint DNS DoH
   if (url.pathname === "/dns-query") {
     return handleDNSQuery(req);
   }
 
-  // REST API Stats
   if (url.pathname === "/api/stats") {
     const total = (await kv.get<bigint>(["stats", "total"])).value || 0n;
     const blocked = (await kv.get<bigint>(["stats", "blocked"])).value || 0n;
     const allowed = (await kv.get<bigint>(["stats", "allowed"])).value || 0n;
-    const domainCount = (await kv.get<number>(["config", "total_blocked_count"])).value || 0;
 
     const logs = [];
     for await (const entry of kv.list({ prefix: ["logs"] }, { limit: 20, reverse: true })) {
@@ -206,161 +187,29 @@ Deno.serve(async (req: Request) => {
       total: Number(total),
       blocked: Number(blocked),
       allowed: Number(allowed),
-      domainCount,
       logs,
     });
   }
 
-  // REST API Config
-  if (url.pathname === "/api/config") {
-    if (req.method === "GET") {
-      const upstreams = (await kv.get(["config", "upstreams"])).value || [];
-      const blocklists = (await kv.get(["config", "blocklists"])).value || [];
-      return Response.json({ upstreams, blocklists });
-    }
-
-    if (req.method === "POST") {
-      const body = await req.json();
-      if (body.upstreams) await kv.set(["config", "upstreams"], body.upstreams);
-      if (body.blocklists) await kv.set(["config", "blocklists"], body.blocklists);
-      return Response.json({ success: true });
-    }
-  }
-
-  // REST API Sync Blocklist
-  if (url.pathname === "/api/sync" && req.method === "POST") {
-    const count = await syncBlocklists();
-    return Response.json({ success: true, count });
-  }
-
-  // Giao diện Web Dashboard Single Page
   return new Response(`
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Serverless DNS Dashboard</title>
+  <title>Serverless DoH DNS Status</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
-    .container { max-width: 900px; margin: 0 auto; }
-    h1 { color: #38bdf8; }
-    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
-    .card { background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155; }
-    .card h3 { margin: 0; font-size: 12px; color: #94a3b8; }
-    .card p { margin: 6px 0 0; font-size: 22px; font-weight: bold; }
-    .section { background: #1e293b; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #334155; }
-    input, button { background: #0f172a; border: 1px solid #475569; color: #fff; padding: 8px 12px; border-radius: 6px; }
-    button { background: #0284c7; cursor: pointer; border: none; font-weight: bold; }
-    .list-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #334155; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #334155; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; text-align: center; }
+    .card { background: #1e293b; max-width: 600px; margin: 40px auto; padding: 24px; border-radius: 12px; border: 1px solid #334155; }
+    code { background: #0f172a; padding: 6px 12px; border-radius: 6px; color: #38bdf8; word-break: break-all; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>⚡ Serverless DNS Dashboard</h1>
-    <p>DoH URL Endpoint: <code>${url.origin}/dns-query</code></p>
-
-    <div class="grid">
-      <div class="card"><h3>TỔNG REQUEST</h3><p id="stTotal">0</p></div>
-      <div class="card"><h3>ĐÃ CHẶN</h3><p style="color:#f43f5e;" id="stBlocked">0</p></div>
-      <div class="card"><h3>CHO PHÉP</h3><p style="color:#10b981;" id="stAllowed">0</p></div>
-      <div class="card"><h3>DOMAIN TRONG BLOCKLIST</h3><p id="stDomains">0</p></div>
-    </div>
-
-    <div class="section">
-      <h3>🌐 Upstream DNS Servers</h3>
-      <div id="upstreamList"></div>
-      <div style="margin-top:10px; display:flex; gap:8px;">
-        <input type="text" id="newUpstream" placeholder="https://1.1.1.1/dns-query" style="flex:1;">
-        <button onclick="addUpstream()">Thêm Upstream</button>
-      </div>
-    </div>
-
-    <div class="section">
-      <h3>🛡️ Nguồn Blocklist (URLs)</h3>
-      <div id="blocklistList"></div>
-      <div style="margin-top:10px; display:flex; gap:8px;">
-        <input type="text" id="newBlocklist" placeholder="https://domain.com/hosts.txt" style="flex:1;">
-        <button onclick="addBlocklist()">Thêm Nguồn Chặn</button>
-      </div>
-      <button onclick="syncBlocklists()" style="margin-top:12px; background:#16a34a; width:100%;">🔄 Đồng bộ danh sách chặn vào Deno KV</button>
-    </div>
-
-    <div class="section">
-      <h3>📋 Nhật Ký Truy Vấn Mới Nhất</h3>
-      <table>
-        <thead><tr><th>Thời gian</th><th>Domain</th><th>Trạng thái</th><th>IP Client</th></tr></thead>
-        <tbody id="logsTable"></tbody>
-      </table>
-    </div>
+  <div class="card">
+    <h2>⚡ Serverless DoH DNS Running</h2>
+    <p>DoH Endpoint của bạn:</p>
+    <p><code>${url.origin}/dns-query</code></p>
   </div>
-
-  <script>
-    let currentConfig = { upstreams: [], blocklists: [] };
-
-    async function loadData() {
-      const resStats = await fetch('/api/stats');
-      const stats = await resStats.json();
-      document.getElementById('stTotal').innerText = stats.total;
-      document.getElementById('stBlocked').innerText = stats.blocked;
-      document.getElementById('stAllowed').innerText = stats.allowed;
-      document.getElementById('stDomains').innerText = stats.domainCount.toLocaleString();
-
-      const tbody = document.getElementById('logsTable');
-      tbody.innerHTML = stats.logs.map(l => \`
-        <tr>
-          <td>\${l.time}</td>
-          <td><b>\${l.domain}</b></td>
-          <td><span style="color:\${l.blocked ? '#f43f5e' : '#10b981'}">\${l.blocked ? 'BLOCKED' : 'ALLOWED'}</span></td>
-          <td>\${l.clientIp}</td>
-        </tr>
-      \`).join('');
-
-      const resConfig = await fetch('/api/config');
-      currentConfig = await resConfig.json();
-      renderConfig();
-    }
-
-    function renderConfig() {
-      document.getElementById('upstreamList').innerHTML = currentConfig.upstreams.map((u, i) => \`
-        <div class="list-item"><span>\${u}</span><button onclick="removeUpstream(\${i})" style="background:#e11d48">Xóa</button></div>
-      \`).join('');
-
-      document.getElementById('blocklistList').innerHTML = currentConfig.blocklists.map((b, i) => \`
-        <div class="list-item"><span>\${b}</span><button onclick="removeBlocklist(\${i})" style="background:#e11d48">Xóa</button></div>
-      \`).join('');
-    }
-
-    async function saveConfig() {
-      await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(currentConfig) });
-      renderConfig();
-    }
-
-    async function addUpstream() {
-      const val = document.getElementById('newUpstream').value.trim();
-      if(val) { currentConfig.upstreams.push(val); await saveConfig(); document.getElementById('newUpstream').value = ''; }
-    }
-    async function removeUpstream(i) { currentConfig.upstreams.splice(i, 1); await saveConfig(); }
-
-    async function addBlocklist() {
-      const val = document.getElementById('newBlocklist').value.trim();
-      if(val) { currentConfig.blocklists.push(val); await saveConfig(); document.getElementById('newBlocklist').value = ''; }
-    }
-    async function removeBlocklist(i) { currentConfig.blocklists.splice(i, 1); await saveConfig(); }
-
-    async function syncBlocklists() {
-      alert("Đang tải dữ liệu từ các nguồn...");
-      const res = await fetch('/api/sync', { method: 'POST' });
-      const data = await res.json();
-      alert("Đã đồng bộ thành công " + data.count + " domain vào Deno KV!");
-      loadData();
-    }
-
-    loadData();
-    setInterval(loadData, 3000);
-  </script>
 </body>
 </html>
-  `, { headers: { "content-type": "text/html; charset=utf-8" } });
+  `, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 });
