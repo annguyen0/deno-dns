@@ -1,6 +1,6 @@
 import dnsPacket from "npm:dns-packet@^5.6.1";
 import { decodeBase64Url } from "jsr:@std/encoding/base64url";
-import { App } from "$fresh/server.ts";
+import { App } from "https://deno.land/x/fresh@v1.7.3/server.ts";
 
 const kv = await Deno.openKv();
 
