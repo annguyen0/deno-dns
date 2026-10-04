@@ -24,7 +24,6 @@ export async function initStorage() {
         ...u,
         enabled: oldUpstreams.value.includes(u.url),
       }));
-      // Thêm các custom upstream cũ nếu có
       for (const oldUrl of oldUpstreams.value) {
         if (!DEFAULT_UPSTREAMS.some((u) => u.url === oldUrl)) {
           merged.push({
@@ -42,6 +41,20 @@ export async function initStorage() {
       await kv.set(["config", "upstreams_catalog"], merged);
     } else {
       await kv.set(["config", "upstreams_catalog"], DEFAULT_UPSTREAMS);
+    }
+  } else {
+    // Tự động bổ sung các upstream mới từ catalog mặc định nếu chưa có
+    const existing = upstreamsEntry.value;
+    const existingIds = new Set(existing.map((u) => u.id));
+    let hasNew = false;
+    for (const def of DEFAULT_UPSTREAMS) {
+      if (!existingIds.has(def.id)) {
+        existing.push(def);
+        hasNew = true;
+      }
+    }
+    if (hasNew) {
+      await kv.set(["config", "upstreams_catalog"], existing);
     }
   }
 

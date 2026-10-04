@@ -1,0 +1,1521 @@
+[
+  {
+    "provider": "AdFilter",
+    "urls": [
+      "https://per.adfilter.net/dns-query",
+      "https://adl.adfilter.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, aggregated statistics kept for 30 days. Also support DoT"
+  },
+  {
+    "provider": "Adfreedns",
+    "urls": [
+      "https://adfreedns.top/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking. Also support DoT &amp; DoQ"
+  },
+  {
+    "provider": "AdGuard",
+    "urls": [
+      "https://dns.adguard-dns.com/dns-query",
+      "https://family.adguard-dns.com/dns-query",
+      "https://unfiltered.adguard-dns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Default provides ad-blocking at DNS level, while Family protection adds adult site blocking. DNSSEC enabled and TLS 1.3. Also support DoT &amp; DoQ"
+  },
+  {
+    "provider": "AliDNS",
+    "urls": [
+      "https://dns.alidns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Also support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Andrews &amp; Arnold",
+    "urls": [
+      "https://dns.aa.net.uk/dns-query"
+    ],
+    "working": true,
+    "comment": "no logging (see DNS Disclaimer ), also support DoT"
+  },
+  {
+    "provider": "Angry.im",
+    "urls": [
+      "https://doh.angry.im/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, OpenNIC"
+  },
+  {
+    "provider": "anon.no",
+    "urls": [
+      "https://dns.anon.no/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use AdGuard browsing security web service, also support DoT &amp; DoQ"
+  },
+  {
+    "provider": "applewebkit.dev",
+    "urls": [
+      "https://dns.applewebkit.dev/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, also support DoT"
+  },
+  {
+    "provider": "Aquilenet DNS",
+    "urls": [
+      "https://dns.aquilenet.fr/dns-query"
+    ],
+    "working": true,
+    "comment": "Non profit ISP DIY in France. Support IPv4+IPv6, DoT, uncensored, unfiltered, encrypted, DNSSEC"
+  },
+  {
+    "provider": "arnor.org",
+    "urls": [
+      "https://nsec.arnor.org/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, malware, phishing. support DoT, DoQ &amp; DoH3. Only logs filtered URLs. Redirects some URLs for privacy. DNSSEC is enforced. (see DNS Disclaimer )"
+  },
+  {
+    "provider": "Asteri Moon",
+    "urls": [
+      "https://dns.asterimoon.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, also support DoT"
+  },
+  {
+    "provider": "a47.me",
+    "urls": [
+      "https://dns.a47.me/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "bazooki-infra.dev",
+    "urls": [
+      "https://bazooki-infra.dev/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Belnet",
+    "urls": [
+      "https://dns.belnet.be/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Ben Hocking",
+    "urls": [
+      "https://dns.bmwhocking.com/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "BITServices",
+    "urls": [
+      "https://dns.bitservices.io/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, use Cloudflare upstream, also support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Blokada DNS",
+    "urls": [
+      "https://dns.blokada.org/dns-query"
+    ],
+    "working": true,
+    "comment": "No logging, also support DoT"
+  },
+  {
+    "provider": "Blue Shield Umbrella",
+    "urls": [
+      "https://rfree1.blue-shield.at/dns-query",
+      "https://rfree2.blue-shield.at/dns-query"
+    ],
+    "working": true,
+    "comment": "Also support DoT"
+  },
+  {
+    "provider": "brembeck.cloud",
+    "urls": [
+      "https://dns.brembeck.cloud/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads &amp; porn, use AdGuard browsing security and parental control web service"
+  },
+  {
+    "provider": "busold.ws",
+    "urls": [
+      "https://dns.busold.ws/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, also support DoT"
+  },
+  {
+    "provider": "Canarypwn",
+    "urls": [
+      "https://doh.aaaab3n.moe/dns-query-114514"
+    ],
+    "working": true,
+    "comment": "Use Cloudflare upstream"
+  },
+  {
+    "provider": "caspervk.net",
+    "urls": [
+      "https://dns.caspervk.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT"
+  },
+  {
+    "provider": "CERT Estonia",
+    "urls": [
+      "https://dns.cert.ee/dns-query"
+    ],
+    "working": true,
+    "comment": "Block phishing, malware, porn &amp; gambling, support DoT"
+  },
+  {
+    "provider": "Charter",
+    "urls": [
+      "https://doh-01.spectrum.com/dns-query",
+      "https://doh-02.spectrum.com/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "chenu.ch",
+    "urls": [
+      "https://dns.chenu.ch/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, support DoT"
+  },
+  {
+    "provider": "Christer Warén",
+    "urls": [
+      "https://dns.christerwaren.fi"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "ChunghwaMC",
+    "urls": [
+      "https://dns.chunghwamc.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "CIRA Canadian Shield",
+    "urls": [
+      "https://private.canadianshield.cira.ca/dns-query",
+      "https://protected.canadianshield.cira.ca/dns-query",
+      "https://family.canadianshield.cira.ca/dns-query"
+    ],
+    "working": true,
+    "comment": "Supports DNSSEC, DoT, keeps DNS traffic inside Canada. Private: DNS resolution service that keeps your DNS data private from third-parties. Protected: Includes Private features and adds malware and phishing blocking. Family: Includes Protected and Private features and blocks pornographic content."
+  },
+  {
+    "provider": "Cisco Umbrella (OpenDNS)",
+    "urls": [
+      "https://doh.opendns.com/dns-query",
+      "https://doh.familyshield.opendns.com/dns-query",
+      "https://doh.umbrella.com/dns-query"
+    ],
+    "working": true,
+    "comment": "DNSSEC, Anycast"
+  },
+  {
+    "provider": "CleanBrowsing",
+    "urls": [
+      "https://doh.cleanbrowsing.org/doh/family-filter/",
+      "https://doh.cleanbrowsing.org/doh/adult-filter/",
+      "https://doh.cleanbrowsing.org/doh/security-filter/"
+    ],
+    "working": true,
+    "comment": "anycast DoH server with parental control (restricts access to adult content + enforces safe search), support DoT"
+  },
+  {
+    "provider": "CleverAdmin",
+    "urls": [
+      "https://dns1.techniverse.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, also support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Cloudflare",
+    "urls": [
+      "https://cloudflare-dns.com/dns-query",
+      "https://mozilla.cloudflare-dns.com/dns-query",
+      "https://security.cloudflare-dns.com/dns-query",
+      "https://family.cloudflare-dns.com/dns-query",
+      "https://dns64.cloudflare-dns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Supports both -04 and -13 content-types, also support DoT"
+  },
+  {
+    "provider": "Comss.one DNS",
+    "urls": [
+      "https://dns.comss.one/dns-query"
+    ],
+    "working": true,
+    "comment": "Comss.one DNS – fast and secure DNS servers based on SmartDNS with access to AI services, protection from advertising, tracking, phishing and malicious sites, and support for encryption of DNS requests-over-HTTPS, DNS-over-TLS and DNS-over-QUIC"
+  },
+  {
+    "provider": "Control D",
+    "urls": [
+      "https://freedns.controld.com/p0",
+      "https://freedns.controld.com/p1",
+      "https://freedns.controld.com/p2",
+      "https://freedns.controld.com/p3",
+      "https://freedns.controld.com/family",
+      "https://freedns.controld.com/uncensored",
+      "https://freedns.controld.com/x-oisd",
+      "https://freedns.controld.com/x-oisd-basic",
+      "https://freedns.controld.com/x-stevenblack",
+      "https://freedns.controld.com/x-devdan",
+      "https://freedns.controld.com/x-1hosts-mini",
+      "https://freedns.controld.com/x-1hosts-lite",
+      "https://freedns.controld.com/x-1hosts-pro",
+      "https://freedns.controld.com/x-hagezi-light",
+      "https://freedns.controld.com/x-hagezi-normal",
+      "https://freedns.controld.com/x-hagezi-pro",
+      "https://freedns.controld.com/x-hagezi-proplus",
+      "https://freedns.controld.com/x-hagezi-ultimate",
+      "https://freedns.controld.com/x-hagezi-tif",
+      "https://freedns.controld.com/x-goodbyeads",
+      "https://freedns.controld.com/x-adguard"
+    ],
+    "working": true,
+    "comment": "ControlD is a fully customizable anycast DNS service that allows you to not only block annoyances like malware, tracking, ads, IoT telemetry, and more but also unblock over 180 services through a network of proxies in over 100 cities, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "CynthiaLabs",
+    "urls": [
+      "https://dns.cynthialabs.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking"
+  },
+  {
+    "provider": "CZ.NIC",
+    "urls": [
+      "https://odvr.nic.cz/dns-query"
+    ],
+    "working": true,
+    "comment": "Runs on Knot Resolver ( doh2 ), supports DNSSEC, provided by .cz TLD operator, support DoT"
+  },
+  {
+    "provider": "data.haus",
+    "urls": [
+      "https://ns.data.haus/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, non-logging, support DoT"
+  },
+  {
+    "provider": "datenquark.de",
+    "urls": [
+      "https://dns.datenquark.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT"
+  },
+  {
+    "provider": "dev-umbrellagov",
+    "urls": [
+      "https://dns.dev-umbrellagov.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "Digitale Gesellschaft",
+    "urls": [
+      "https://dns.digitale-gesellschaft.ch/dns-query"
+    ],
+    "working": true,
+    "comment": "No query/IP logging, no filtering, QNAME minimization, TLS 1.3, DNSSEC, DoT; https://www.digitale-gesellschaft.ch/dns/"
+  },
+  {
+    "provider": "Disconnect.app",
+    "urls": [
+      "https://doh.disconnect.app/dns-query"
+    ],
+    "working": true,
+    "comment": "Use Cloudflare upstream"
+  },
+  {
+    "provider": "dns.digitalsize.net",
+    "urls": [
+      "https://dns.digitalsize.net/dns-query"
+    ],
+    "working": true,
+    "comment": "A public, non-tracking, non-filtering DNS resolver with DNSSEC enabled, QNAME minimization and no EDNS client subnet. Supports DoT. Hosted in Germany."
+  },
+  {
+    "provider": "DNS.SB",
+    "urls": [
+      "https://doh.dns.sb/dns-query"
+    ],
+    "working": true,
+    "comment": "DNSSEC &amp; QNAME minimization enabled, no logging, also support DoT"
+  },
+  {
+    "provider": "DNS4all",
+    "urls": [
+      "https://doh.dns4all.eu/dns-query"
+    ],
+    "working": true,
+    "comment": "Non-logging, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "DNS4EU",
+    "urls": [
+      "https://protective.joindns4.eu/dns-query",
+      "https://child.joindns4.eu/dns-query",
+      "https://noads.joindns4.eu/dns-query",
+      "https://child-noads.joindns4.eu/dns-query",
+      "https://unfiltered.joindns4.eu/dns-query"
+    ],
+    "working": true,
+    "comment": "Co-funded by EU, run by consortium of companies in EU, anonymized and aggregated logging."
+  },
+  {
+    "provider": "dns4me",
+    "urls": [
+      "https://ca01.dns4me.net",
+      "https://ca02.dns4me.net",
+      "https://us01.dns4me.net",
+      "https://us02.dns4me.net",
+      "https://sg01.dns4me.net",
+      "https://sa01.dns4me.net",
+      "https://au01.dns4me.net",
+      "https://uk01.dns4me.net",
+      "https://nz01.dns4me.net",
+      "https://ie01.dns4me.net",
+      "https://de01.dns4me.net"
+    ],
+    "working": true,
+    "comment": "Also support DoT"
+  },
+  {
+    "provider": "dns.flatuslifir.is",
+    "urls": [
+      "https://dns.flatuslifir.is/dns-query"
+    ],
+    "working": true,
+    "comment": "no logging, no filtering. Also support DoT"
+  },
+  {
+    "provider": "dnsforge.de",
+    "urls": [
+      "https://dnsforge.de/dns-query",
+      "https://clean.dnsforge.de/dns-query",
+      "https://hard.dnsforge.de/dns-query"
+    ],
+    "working": true,
+    "comment": "No logging. Support DNSSEC. Hosted in Germany, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "dnsHome.de",
+    "urls": [
+      "https://dns.dnshome.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Supports DoH/DoH3 DoT/DoQ and DNSCrypt, No logging, No blocking"
+  },
+  {
+    "provider": "dnslow.me",
+    "urls": [
+      "https://dnslow.me/dns-query"
+    ],
+    "working": true,
+    "comment": "A protective DNS that blocks Ads, Malware, Trackers, Phishing and Newly Registered Domains. Randomly forward requests to different upstreams for enhanced privacy. Support DoT"
+  },
+  {
+    "provider": "DNS over Tor",
+    "urls": [
+      "https://japan.dnsovertor.cc/dns-query",
+      "https://chuncheon.dnsovertor.cc/dns-query",
+      "https://seoul.dnsovertor.cc/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "DNSDOH",
+    "urls": [
+      "https://dnsdoh.art/dns-query"
+    ],
+    "working": true,
+    "comment": "A public resolver on 194.180.189.33. It filters ads, trackers, malware and phishing with four public blocklists, and answers over four encrypted transports."
+  },
+  {
+    "provider": "DNSPod",
+    "urls": [
+      "https://dns.pub/dns-query"
+    ],
+    "working": true,
+    "comment": "Operated by Tencent Cloud, support DoT"
+  },
+  {
+    "provider": "doh.beauty",
+    "urls": [
+      "https://doh.beauty"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "doh.buzz",
+    "urls": [
+      "https://doh.buzz/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "domreg.lt",
+    "urls": [
+      "https://doh.domreg.lt/dns-query"
+    ],
+    "working": true,
+    "comment": "Block porn &amp; gambling, support DoT"
+  },
+  {
+    "provider": "dshubham.xyz",
+    "urls": [
+      "https://agh.dshubham.xyz/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Dukun.de",
+    "urls": [
+      "https://dukun.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "duröhre.de",
+    "urls": [
+      "https://xn--durhre-yxa.de/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "d94.xyz",
+    "urls": [
+      "https://dns.d94.xyz/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "Easy HNS",
+    "urls": [
+      "https://dns.easyhns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT, also resolve Handshake domains"
+  },
+  {
+    "provider": "Elemental Software",
+    "urls": [
+      "https://dns.elemental.software/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "envs.net",
+    "urls": [
+      "https://dns.envs.net/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "faked.org",
+    "urls": [
+      "https://dns.faked.org/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "familiamv.net",
+    "urls": [
+      "https://dnsvps.familiamv.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "farshidhakimy.de",
+    "urls": [
+      "https://dns.farshidhakimy.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use AdGuard browsing security web service, support DoT"
+  },
+  {
+    "provider": "FDN - French Data Network",
+    "urls": [
+      "https://ns0.fdn.fr/dns-query",
+      "https://ns1.fdn.fr/dns-query"
+    ],
+    "working": true,
+    "comment": "No log, no filter, DNSSEC, DoT … ( more informations in French )"
+  },
+  {
+    "provider": "Feroz",
+    "urls": [
+      "https://doh.li/dns-query"
+    ],
+    "working": true,
+    "comment": "Use Cloudflare upstream"
+  },
+  {
+    "provider": "ffmuc.net",
+    "urls": [
+      "https://doh.ffmuc.net/dns-query"
+    ],
+    "working": true,
+    "comment": "DoH &amp; DoT Server of Freifunk München. No logging, no filter, DNSSEC, OpenNIC, own recursion. More in our wiki"
+  },
+  {
+    "provider": "fidelius.top",
+    "urls": [
+      "https://fidelius.top/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "floriantinney.de",
+    "urls": [
+      "https://dns.floriantinney.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Use AdGuard browsing security web service, support DoT"
+  },
+  {
+    "provider": "Foundation for Applied Privacy",
+    "urls": [
+      "https://doh.applied-privacy.net/query"
+    ],
+    "working": true,
+    "comment": "No query/IP logging, no filtering, QNAME minimization, no EDNS client subnet, TLS 1.3, DNSSEC, RFC7706, RFC8198, DoT"
+  },
+  {
+    "provider": "Foxyfy DNS",
+    "urls": [
+      "https://es-ma.foxyfy.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Public DoH service."
+  },
+  {
+    "provider": "FurrIX vIX",
+    "urls": [
+      "https://dns.furrix.zone/dns-query"
+    ],
+    "working": true,
+    "comment": "OpenNIC compatible with support for DoT and DoH. Small community project providing two name servers over IPv4/IPv6. Hosted in Kansas City, MO, US. Used to be operated by Marbled Fennec Networks."
+  },
+  {
+    "provider": "FutaDNS",
+    "urls": [
+      "https://doh.futa.gg/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT through dot.futa.gg"
+  },
+  {
+    "provider": "Gamban",
+    "urls": [
+      "https://dns.gamban.com/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "gibblets.top",
+    "urls": [
+      "https://gibblets.top/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "glacius.top",
+    "urls": [
+      "https://glacius.top/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Google",
+    "urls": [
+      "https://dns.google/dns-query",
+      "https://dns64.dns.google/dns-query",
+      "https://8888.google/dns-query"
+    ],
+    "working": true,
+    "comment": "Full RFC 8484 support, EDNS, DNSSEC, no filtering, support DoT"
+  },
+  {
+    "provider": "Gottlieb Freitag",
+    "urls": [
+      "https://dns.glf.wtf/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT"
+  },
+  {
+    "provider": "Guardio",
+    "urls": [
+      "https://dns.guard.io/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Hafnova",
+    "urls": [
+      "https://secure.hafnova.com/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "HaGeZi DNS",
+    "urls": [
+      "https://root.hagezi.org/dns-query",
+      "https://wurzn.hagezi.org/dns-query",
+      "https://juuri.hagezi.org/dns-query"
+    ],
+    "working": true,
+    "comment": "Free, non-commercial EU public DNS servers with security filtering"
+  },
+  {
+    "provider": "Hakase",
+    "urls": [
+      "https://dns.haka.se/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads"
+  },
+  {
+    "provider": "HNS DoH",
+    "urls": [
+      "https://hnsdoh.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT, also resolve Handshake domain"
+  },
+  {
+    "provider": "Hostux.net",
+    "urls": [
+      "https://dns.hostux.net/dns-query",
+      "https://dns.hostux.net/ads"
+    ],
+    "working": true,
+    "comment": "DNSSEC, no EDNS Client-Subnet, not logging queries' content, hosted in Luxembourg."
+  },
+  {
+    "provider": "HQDNS",
+    "urls": [
+      "https://dns.hqdns.sarl/dns-query"
+    ],
+    "working": true,
+    "comment": "Independent public DNS resolver with filtering for ads, trackers, malware and phishing. Personal, non-commercial project. HQDNS does not retain DNS query logs and performs its own recursive DNS resolution (operator-confirmed). Also supports DoT at dns.hqdns.sarl, IPv4 185.215.166.168 and IPv6 2a02:c207:2355:6761::1. Tested on 2026-10-02."
+  },
+  {
+    "provider": "Huque",
+    "urls": [
+      "https://doth.huque.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "imperio.top",
+    "urls": [
+      "https://imperio.top/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "In-Berlin",
+    "urls": [
+      "https://dns1.in-berlin.de/dns-query",
+      "https://dns2.in-berlin.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "Inforlogia",
+    "urls": [
+      "https://dns.inforlogia.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Internet Initiative Japan",
+    "urls": [
+      "https://public.dns.iij.jp/dns-query"
+    ],
+    "working": true,
+    "comment": "Planned to run until March 2027, support DoT"
+  },
+  {
+    "provider": "kapite.in",
+    "urls": [
+      "https://dns.kapite.in/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads &amp; gambling, use Cloudflare upstream with malware filtering and AdGuard browsing security web service, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Kernel Error",
+    "urls": [
+      "https://dns.kernel-error.de/dns-query"
+    ],
+    "working": true,
+    "comment": "DNSSEC-validating, support DoT &amp; DoQ, Privacy-Policy"
+  },
+  {
+    "provider": "kescher",
+    "urls": [
+      "https://dns.kescher.at/dns-query"
+    ],
+    "working": true,
+    "comment": "DNSSEC-validating, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Koala",
+    "urls": [
+      "https://dns.koala.us.to/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, support DoT"
+  },
+  {
+    "provider": "Kosan",
+    "urls": [
+      "https://dns.kosan.moe/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads"
+  },
+  {
+    "provider": "krctech.dev",
+    "urls": [
+      "https://adblock.krctech.dev/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "La Contre-Voie",
+    "urls": [
+      "https://doh.lacontrevoie.fr/dns-query"
+    ],
+    "working": true,
+    "comment": "Supports DNSSEC and IPv6, not logging queries' content, uses unbound . Commits for net neutrality, hosted in France."
+  },
+  {
+    "provider": "Liberador.net",
+    "urls": [
+      "https://dns.liberador.net"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "LibreDNS",
+    "urls": [
+      "https://doh.libredns.gr/dns-query",
+      "https://doh.libredns.gr/noads"
+    ],
+    "working": true,
+    "comment": "Non-logging, OpenNIC, support DoT"
+  },
+  {
+    "provider": "loadlow.me",
+    "urls": [
+      "https://loadlow.me/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "LobbyGod",
+    "urls": [
+      "https://dns.lobbygod.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "LuMa Medien",
+    "urls": [
+      "https://dns.luma-medien.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use AdGuard browsing security web service, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "l337.site",
+    "urls": [
+      "https://dns.l337.site/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "marasov.id",
+    "urls": [
+      "https://dns.marasov.id/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream"
+  },
+  {
+    "provider": "Masters of Cloud",
+    "urls": [
+      "https://masters-of-cloud.de/dns-query"
+    ],
+    "working": true,
+    "comment": "OpenNIC, support DoT"
+  },
+  {
+    "provider": "mateo.ovh",
+    "urls": [
+      "https://dns.mateo.ovh/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads &amp; porn, use Cloudflare upstream, AdGuard browsing security web service, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Mayx",
+    "urls": [
+      "https://dns.mayx.eu.org/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "meddy94.de",
+    "urls": [
+      "https://adguard.meddy94.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, support DoT"
+  },
+  {
+    "provider": "mh4ckt3mh4ckt1c4s.xyz",
+    "urls": [
+      "https://dns.mh4ckt3mh4ckt1c4s.xyz/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT"
+  },
+  {
+    "provider": "m-it.ro",
+    "urls": [
+      "https://addns1.m-it.ro/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream and AdGuard browsing security web service"
+  },
+  {
+    "provider": "mmmalia.com",
+    "urls": [
+      "https://doh.mmmalia.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads &amp; porn, use AdGuard parental control web service"
+  },
+  {
+    "provider": "mydns.network",
+    "urls": [
+      "https://freedom.mydns.network/dns-query",
+      "https://paranoia.mydns.network/dns-query",
+      "https://adblock.mydns.network/dns-query",
+      "https://family.mydns.network/dns-query"
+    ],
+    "working": true,
+    "comment": "Public DoH server powered by Cloudflare Workers. Uniquely disguises your queries by relaying queries your behalf to upstream DoH servers with no IP address information. Open source , deploy your own instance at any time! Also support DoT"
+  },
+  {
+    "provider": "MZJ Technology",
+    "urls": [
+      "https://dns.mzjtechnology.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "nashkan.net",
+    "urls": [
+      "https://ae-fuj-w-p-1.nashkan.net/dns-query",
+      "https://ae-fuj-w-p-2.nashkan.net/dns-query",
+      "https://ae-fuj-w-p-3.nashkan.net/dns-query",
+      "https://au-syd-w-f-1.nashkan.net/dns-query",
+      "https://gb-lon-w-p-2.nashkan.net/dns-query",
+      "https://ro-buc-w-p-1.nashkan.net/dns-query",
+      "https://sg-w-p-1.nashkan.net/dns-query",
+      "https://us-chi-w-f-1.nashkan.net/dns-query",
+      "https://us-chi-w-p-1.nashkan.net/dns-query",
+      "https://us-jac-w-f-1.nashkan.net/dns-query",
+      "https://us-jac-w-p-1.nashkan.net/dns-query",
+      "https://us-kan-w-p-1.nashkan.net/dns-query",
+      "https://us-nyc-w-p-1.nashkan.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream with malware filtering"
+  },
+  {
+    "provider": "neeb.it",
+    "urls": [
+      "https://dns.neeb.it/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "NextDNS",
+    "urls": [
+      "https://dns.nextdns.io"
+    ],
+    "working": true,
+    "comment": "The first cloud-based private DNS service that gives you full control over what is allowed and what is blocked on the Internet. 300,000 domain resolution per month is free with non-filtering afterward until the end of the month. Granular dashboard, Each account can create multiple configurations, which can be used for multiple devices with prefixes to track activities on the dashboard. Create a config ID , support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Nick Slowinski",
+    "urls": [
+      "https://dns.nick-slowinski.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads"
+  },
+  {
+    "provider": "NIC.LV",
+    "urls": [
+      "https://doh.lv/dns-query",
+      "https://doh.nic.lv/dns-query"
+    ],
+    "working": true,
+    "comment": "Run by .lv TLD registry , support DoT"
+  },
+  {
+    "provider": "Nicolas Dorriere",
+    "urls": [
+      "https://doh-dilution-to-upstreams-adguardhome.nicolas-dorriere.fr/dns-query"
+    ],
+    "working": true,
+    "comment": "Dilution Upstreams adguard home - dilution 10 upstreams - load-balancing mode - self-hosted in France - adblock (5 lists) - DNSSEC - no filter - no logging - cache - dns request ~90ms"
+  },
+  {
+    "provider": "NiYaWe",
+    "urls": [
+      "https://doh.niyawe.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT through dot.niyawe.de"
+  },
+  {
+    "provider": "Njalla",
+    "urls": [
+      "https://dns.njal.la/dns-query"
+    ],
+    "working": true,
+    "comment": "Non logging, based in Sweden"
+  },
+  {
+    "provider": "novg.net",
+    "urls": [
+      "https://dns.novg.net/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Omada",
+    "urls": [
+      "https://dns.omada.cafe/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, also support DoT"
+  },
+  {
+    "provider": "OpenBLD.net",
+    "urls": [
+      "https://ada.openbld.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, malicious. Support DoT, DoH - HTTP/2, TLSv1.3. Without DNS leaks. Use own upstreams and update services."
+  },
+  {
+    "provider": "OpenLoop",
+    "urls": [
+      "https://ag.apollohct.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "o2cloud.fr",
+    "urls": [
+      "https://dns4eu.online/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "PaesaDNS",
+    "urls": [
+      "https://dns.paesa.es/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, non-logging, use Cloudflare upstream with malware filtering"
+  },
+  {
+    "provider": "Paulo",
+    "urls": [
+      "https://dns.paulo.nom.za/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Pavol Decky",
+    "urls": [
+      "https://dns.decky.eu/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "plan9-dns",
+    "urls": [
+      "https://kronos.plan9-dns.com/dns-query",
+      "https://helios.plan9-dns.com/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "PlumeDNS",
+    "urls": [
+      "https://privacy.plumedns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "pooblet.co.za",
+    "urls": [
+      "https://pooblet.co.za/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, use Cloudflare upstream"
+  },
+  {
+    "provider": "Practically Unhackable",
+    "urls": [
+      "https://dns.practicallyunhackable.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Also support DoT"
+  },
+  {
+    "provider": "Quad9",
+    "urls": [
+      "https://dns.quad9.net/dns-query",
+      "https://dns9.quad9.net/dns-query",
+      "https://dns10.quad9.net/dns-query",
+      "https://dns11.quad9.net/dns-query",
+      "https://dns12.quad9.net/dns-query"
+    ],
+    "working": true,
+    "comment": "dns9.quad9.net is another alias for dns.quad9.net, see: https://quad9.net/news/blog/doh-with-quad9-dns-servers 9.9.9.9 - Malware blocking, DNSSEC validation 9.9.9.10 - No malware blocking, no DNSSEC validation 9.9.9.11 - Malware blocking, DNSSEC validation, ECS enabled 9.9.9.12 - No malware blocking, no DNSSEC validation, ECS enabled, support DoT"
+  },
+  {
+    "provider": "Quiet Rocks",
+    "urls": [
+      "https://dns.quiet.rocks/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "QWER DNS",
+    "urls": [
+      "https://dog.dns.qwer.pw/dns-query",
+      "https://tiger.dns.qwer.pw/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT on port 853 and DoQ on port 784"
+  },
+  {
+    "provider": "redhosting.com.ar",
+    "urls": [
+      "https://dns.redhosting.com.ar/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads &amp; gambling, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "regiopolis.cloud",
+    "urls": [
+      "https://regiopolis.cloud/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Restena",
+    "urls": [
+      "https://dnspub.restena.lu/dns-query"
+    ],
+    "working": true,
+    "comment": "DNSSEC validation, support DoT"
+  },
+  {
+    "provider": "RetakeCS",
+    "urls": [
+      "https://dns.retakecs.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, use AdGuard browsing security web service, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "RethinkDNS",
+    "urls": [
+      "https://sky.rethinkdns.com/dns-query",
+      "https://sky.rethinkdns.com/1:IAAgAA=="
+    ],
+    "working": true,
+    "comment": "An open-source stub resolver running in 200+ locations world-wide on Cloudfare's network. Fast, secure, private, transparent, configurable DNS resolver. No ECS. Implements CNAME Cloaking. No-logs. code . Configure custom blocklists with DoH and DoT option"
+  },
+  {
+    "provider": "revelio.top",
+    "urls": [
+      "https://revelio.top/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "RobinGroppe.de",
+    "urls": [
+      "https://dns.rbn.gr/dns-query"
+    ],
+    "working": true,
+    "comment": "Malware blocking, DNSSEC validation, support DoT"
+  },
+  {
+    "provider": "roedel.cloud",
+    "urls": [
+      "https://dns.roedel.cloud/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "SafeServe",
+    "urls": [
+      "https://safeservedns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Operated by Namecheap, support DoT"
+  },
+  {
+    "provider": "shoupperuser.com",
+    "urls": [
+      "https://adguard.shoupperuser.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Ad &amp; porn blocking, use AdGuard browsing security and parental control web service, support DoT"
+  },
+  {
+    "provider": "silen.org",
+    "urls": [
+      "https://dns.silen.org/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads"
+  },
+  {
+    "provider": "simplylinux.ch",
+    "urls": [
+      "https://dns.simplylinux.ch/dns-query"
+    ],
+    "working": true,
+    "comment": "support DoT &amp; DoQ"
+  },
+  {
+    "provider": "skrep.eu",
+    "urls": [
+      "https://dns.skrep.eu/dns-query"
+    ],
+    "working": true,
+    "comment": "OpenNIC, block ads, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Slinkyman.net",
+    "urls": [
+      "https://dns.slinkyman.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Adblocking, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "SmartGuard",
+    "urls": [
+      "https://dns.smartguard.io/dns-query"
+    ],
+    "working": true,
+    "comment": "Customizable policy and filtering, support DoT"
+  },
+  {
+    "provider": "Startup Stack",
+    "urls": [
+      "https://dns.startupstack.tech/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "SZ DNS",
+    "urls": [
+      "https://doh.sz-dns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, Support DoT &amp; DoQ"
+  },
+  {
+    "provider": "stirringphoto.com",
+    "urls": [
+      "https://dns.stirringphoto.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "Surfshark DNS",
+    "urls": [
+      "https://dns.surfsharkdns.com/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT &amp; DoQ"
+  },
+  {
+    "provider": "Sunet DNS",
+    "urls": [
+      "https://resolver.sunet.se/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "Switch",
+    "urls": [
+      "https://dns.switch.ch/dns-query"
+    ],
+    "working": true,
+    "comment": "Block porn &amp; gambling, support DoT"
+  },
+  {
+    "provider": "t53.de",
+    "urls": [
+      "https://dns.t53.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "Telekom Deutschland",
+    "urls": [
+      "https://dns.telekom.de/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "TipsyCoffee",
+    "urls": [
+      "https://dns.tipsy.coffee/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads &amp; gambling, support DoT"
+  },
+  {
+    "provider": "Tls-data.de",
+    "urls": [
+      "https://dns.tls-data.de/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Tiarap",
+    "urls": [
+      "https://doh.tiar.app/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, tracking, malware, scam and phising domains. No Logging, dns0x20 , No ECS , DNSSEC Validation"
+  },
+  {
+    "provider": "UncensoredDNS",
+    "urls": [
+      "https://anycast.uncensoreddns.org/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT &amp; DoQ"
+  },
+  {
+    "provider": "unx.io",
+    "urls": [
+      "https://dns.unx.io/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream, support DoT"
+  },
+  {
+    "provider": "Usable Privacy",
+    "urls": [
+      "https://adfree.usableprivacy.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT"
+  },
+  {
+    "provider": "v.recipes",
+    "urls": [
+      "https://v.recipes/dns-query",
+      "https://v.recipes/dns-adblock",
+      "https://v.recipes/dns-ecs"
+    ],
+    "working": true,
+    "comment": "All variants benefit from anycast network, per-request pacing, and some more optimizations (DoH3, caching, etc.). See the real-time DNS metrics and performance data for information such as Cache Hit Rate, Requests Over Time, and more. Check the page directly for other information such as notes and technical details ."
+  },
+  {
+    "provider": "vaioswolke.xyz",
+    "urls": [
+      "https://dns.vaioswolke.xyz/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "VIA",
+    "urls": [
+      "https://doh.viatech.com.tw/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream"
+  },
+  {
+    "provider": "v0dka.ru",
+    "urls": [
+      "https://v0dka.ru/dns-query"
+    ],
+    "working": true,
+    "comment": "Russia, no logging, no filtering, Unbound recursive resolver"
+  },
+  {
+    "provider": "waringer-atg.de",
+    "urls": [
+      "https://abel.waringer-atg.de/dns-query"
+    ],
+    "working": true,
+    "comment": ""
+  },
+  {
+    "provider": "Wikimedia DNS",
+    "urls": [
+      "https://wikimedia-dns.org/dns-query"
+    ],
+    "working": true,
+    "comment": "No filtering, no ECS except for Wikimedia-run servers, QNAME minimization enabled, DNSSEC validation enforced. Requests are served by the nearest Wikimedia data center, support DoT"
+  },
+  {
+    "provider": "W3C TAG",
+    "urls": [
+      "https://dns.w3ctag.org/dns-query"
+    ],
+    "working": true,
+    "comment": "Support DoT"
+  },
+  {
+    "provider": "YunZheng LAB DNS",
+    "urls": [
+      "https://dns.yunzheng.space/dns-query",
+      "https://filter.dns.yunzheng.space/dns-query"
+    ],
+    "working": true,
+    "comment": "Anycast, DNSSEC validation, no logging, support DoT &amp; DoQ. Run by a non-profit research lab (AS204921)"
+  },
+  {
+    "provider": "zdn.ro",
+    "urls": [
+      "https://zdn.ro/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, use Cloudflare upstream and AdGuard browsing security web service, support DoT &amp; DoQ"
+  },
+  {
+    "provider": "4NetGuides",
+    "urls": [
+      "https://ns2.4netguides.org/dns-query"
+    ],
+    "working": true,
+    "comment": "Block ads, support DoT"
+  },
+  {
+    "provider": "@null31",
+    "urls": [
+      "https://ibuki.cgnat.net/dns-query"
+    ],
+    "working": true,
+    "comment": "Based in Brazil / doh-server (nginx - unbound) / dot-server (unbound) / DNSSEC / QNAME minimization / Uncensored / no logging, no ECS, hosted on Oracle Cloud VPS by null31 , support DoT"
+  },
+  {
+    "provider": "@publicarray dns.seby.io",
+    "urls": [
+      "https://doh.seby.io/dns-query"
+    ],
+    "working": true,
+    "comment": "Australian server that runs @m13253's Go implementation , OpenNIC, Unbound with DNSSEC, No ECS, and No logs. Support DoT"
+  }
+]
