@@ -1,25 +1,15 @@
-export interface UpstreamItem {
-  id: string;
-  name: string;
-  url: string;
-  description: string;
-  tag: "speed" | "security" | "adblock" | "family" | "custom";
-  tagLabel: string;
-  enabled: boolean;
-  isCustom?: boolean;
-}
+// Catalog Admin (nguon du lieu mac dinh) — UpstreamItem + DEFAULT_UPSTREAMS +
+// DEFAULT_BLOCKLISTS + UpstreamCatalogCache in-memory (tra cuu hot path 0 KV).
+//
+// - Catalog luu trong KV ["config","upstreams_catalog"] (source of truth, admin CRUD).
+// - Moi isolate: lam moi cache tu KV khi init + moi chu ky poll (60s, chung voi
+//   blocklist poll) + cap nhat lap tuc sau moi admin CRUD o instance do.
+// - Giao dien UpstreamItem/BlocklistItem: src/types/index.ts (shared).
+// - Logic chon upstream theo region: src/upstream/selector.ts.
 
-export interface BlocklistItem {
-  id: string;
-  name: string;
-  url: string;
-  description: string;
-  category: "vn" | "general" | "privacy" | "malware" | "custom";
-  categoryLabel: string;
-  enabled: boolean;
-  count?: number;
-  isCustom?: boolean;
-}
+import type { BlocklistItem, UpstreamItem } from "../types/index.ts";
+import { CONFIG_KEYS } from "../kv/schema.ts";
+import { selectUpstreamUrls } from "./selector.ts";
 
 export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
   // --- Tốc độ & Toàn cầu (Global Speed & Anycast) ---
@@ -256,3 +246,42 @@ export const DEFAULT_BLOCKLISTS: BlocklistItem[] = [
     enabled: false,
   },
 ];
+
+// --- UpstreamCatalogCache: cache in-memory per-isolate (hot path 0 KV) ---
+
+export class UpstreamCatalogCache {
+  #items: UpstreamItem[] = [];
+
+  get size(): number {
+    return this.#items.length;
+  }
+
+  /** Lam moi cache tu KV (1 read). Loi → giu danh sach cu (cold start → rong). */
+  async refresh(kv: Deno.Kv): Promise<void> {
+    try {
+      const entry = await kv.get<UpstreamItem[]>(CONFIG_KEYS.upstreamsCatalog);
+      if (entry.value && Array.isArray(entry.value)) {
+        this.#items = entry.value;
+      }
+    } catch (e) {
+      console.error("UpstreamCatalogCache: loi refresh, giu danh sach cu:", e);
+    }
+  }
+
+  /** Cap nhat lap tuc sau admin CRUD (instance dang phuc vu cau hinh do). */
+  setItems(items: UpstreamItem[]): void {
+    this.#items = items;
+  }
+
+  /** De test: ve trang thai rong. */
+  reset(): void {
+    this.#items = [];
+  }
+
+  /** Dong URL upstream dang bat, sap xep theo region node (xem selector.ts). */
+  getActiveUpstreamUrls(nodeRegion: string | null): string[] {
+    return selectUpstreamUrls(this.#items, nodeRegion);
+  }
+}
+
+export const upstreamCatalog = new UpstreamCatalogCache();

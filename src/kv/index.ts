@@ -1,6 +1,7 @@
 // Tay chung duy nhat cua Deno KV cho toan app.
 // - App: goi openKv() mot lan (default Deno Deploy / DENO_KV_PATH local).
-// - Test: goi openKv(":memory:") de co KV rieng, khong dinh danh vao file.
+// - Test: goi openKv(":memory:") de co KV rieng, khong danh danh vao file.
+// - Khoa/mau schema: xem src/kv/schema.ts (MANIFEST_KEY, chunkKey, ...).
 
 let handle: Deno.Kv | null = null;
 

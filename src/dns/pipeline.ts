@@ -1,20 +1,17 @@
 import { Buffer } from "node:buffer";
 import dnsPacket from "dns-packet";
-import { checkDohRateLimit } from "./ratelimit.ts";
-import { getClientInfo } from "./clientip.ts";
+import { checkDohRateLimit } from "../ratelimit/limiter.ts";
+import { getClientInfo } from "../clientip/trust.ts";
 import {
   getActiveUpstreamUrls,
   getRewriteIP,
   isBlocked,
   isWhitelisted,
-} from "./storage.ts";
-import { counters } from "./counters.ts";
+} from "../storage.ts";
+import { counters } from "../counters/counter.ts";
+import { corsHeaders, forwardToUpstream } from "./policies.ts";
 
-export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Accept",
-};
+export { corsHeaders };
 
 // Giới hạn kích thước gói tin DNS RFC chuẩn
 const MAX_DNS_PACKET_BYTES = 4096;
@@ -28,58 +25,6 @@ function decodeBase64Url(str: string): Buffer | null {
   } catch {
     return null;
   }
-}
-
-// Forward tới upstream theo thuan tu (ADR-3). KHONG chuyen tiep header client gui
-// (XFF/X-Real-IP) — chi append x-forwarded-for duy nhat tu IP dang tin nen tang.
-async function forwardToUpstream(
-  rawQuery: Buffer,
-  upstreams: string[],
-  trustedClientIp: string | null,
-): Promise<Response> {
-  const xffHeader: string | null = trustedClientIp ? trustedClientIp : null;
-
-  for (const upstream of upstreams) {
-    try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/dns-message",
-        "Accept": "application/dns-message",
-      };
-      if (xffHeader) headers["x-forwarded-for"] = xffHeader;
-
-      const res = await fetch(upstream, {
-        method: "POST",
-        headers,
-        // View dung kich cho byteLength (khong lay Buffer raw — Buffer co the
-        // chung pool alloc lon hon; cast ArrayBuffer vi TS typed-array generics)
-        body: new Uint8Array(
-          rawQuery.buffer as ArrayBuffer,
-          rawQuery.byteOffset,
-          rawQuery.byteLength,
-        ),
-        signal: AbortSignal.timeout(3000), // Timeout 3s tránh treo worker
-      });
-
-      if (res.ok) {
-        const body = await res.arrayBuffer();
-        return new Response(body, {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/dns-message",
-            "Cache-Control": "public, max-age=300",
-          },
-        });
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return new Response("Upstream DNS Error", {
-    status: 502,
-    headers: corsHeaders,
-  });
 }
 
 export async function handleDNSQuery(

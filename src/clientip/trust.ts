@@ -4,18 +4,14 @@
 // Cac header do client tu gan (cf-connecting-ip, x-real-ip, x-forwarded-for,
 // forwarded) LUON BI BO LUA — khong doc, khong dung.
 //
-// TEN HEADER NEN TANG: chua duoc xac nhan chinh thuc tai thoi diem viet code
-// (plan task 1: deploy /api/diag/headers, goi tu 2 vantage point US/EU).
-// Mot khi verify xong, chi can sua PLATFORM_CLIENT_IP_HEADER + format parse o day.
+// Kieu chia se ClientInfo: src/types/index.ts.
 
 import { isIP } from "node:net";
+import type { ClientInfo } from "../types/index.ts";
+import { PLATFORM_CLIENT_IP_HEADER } from "./constants.ts";
 
-export const PLATFORM_CLIENT_IP_HEADER = "x-denoforwarded-for";
-
-export interface ClientInfo {
-  /** IP client dang tin (public, xac real duoc bo nen tang). null = khong xac dinh duoc. */
+export interface ParseResult {
   ip: string | null;
-  /** Ma region/colo cua node Deno dang xu ly (nen tang khong cung cap thi null). */
   nodeRegion: string | null;
 }
 
@@ -49,11 +45,6 @@ export function isPrivateOrLoopbackIp(value: string): boolean {
   if (ip.startsWith("fe80")) return true; // link-local
   if (ip === "::" || ip.startsWith("::ffff:")) return true; // unspecified / IPv4-mapped
   return false;
-}
-
-export interface ParseResult {
-  ip: string | null;
-  nodeRegion: string | null;
 }
 
 /**

@@ -2,7 +2,20 @@
 //
 // Moi Map duoc gioi han dung luc bang LruMap (cap ~100k key) — chan tinh huong ke
 // tan tao "hang triu IP" de han bo nho (plan §5.2.4). Key rate-limit nay la IP thu
-// nhat duoc bo nen tang / remoteAddr (src/clientip.ts), KHONG phai header client tu gan.
+// nhat duoc bo nen tang / remoteAddr (src/clientip/trust.ts), KHONG phai header client tu gan.
+
+import {
+  API_MAX_BURST,
+  API_REFILL_RATE,
+  DOH_MAX_BURST,
+  DOH_REFILL_RATE,
+  LOCKOUT_DURATION_MS,
+  MAX_LOGIN_FAILURES,
+  MAX_TRACKED_IPS,
+  MAX_TRACKED_LOGINS,
+  SWEEP_INTERVAL_MS,
+  SYNC_COOLDOWN_MS,
+} from "./constants.ts";
 
 export class LruMap<K, V> {
   #map = new Map<K, V>();
@@ -67,14 +80,11 @@ interface LoginAttempt {
   lockedUntil: number;
 }
 
-// In-Memory stores for zero-latency checks (LRU-cap)
-const MAX_TRACKED_IPS = 100_000;
 const dohBuckets = new LruMap<string, TokenBucket>(MAX_TRACKED_IPS);
 const apiBuckets = new LruMap<string, TokenBucket>(MAX_TRACKED_IPS);
-const loginAttempts = new LruMap<string, LoginAttempt>(50_000);
+const loginAttempts = new LruMap<string, LoginAttempt>(MAX_TRACKED_LOGINS);
 
 let lastSyncTimestamp = 0;
-const SYNC_COOLDOWN_MS = 180_000; // 3 phút cooldown giữa các lần đồng bộ blocklist
 
 // DDoS Metrics for Dashboard
 export const rateLimitMetrics = {
@@ -85,9 +95,6 @@ export const rateLimitMetrics = {
 };
 
 // --- DoH Rate Limiting (Token Bucket: 60 req/s, Burst 120) ---
-const DOH_REFILL_RATE = 60; // Tokens mỗi giây
-const DOH_MAX_BURST = 120; // Số token tối đa
-
 export function checkDohRateLimit(
   ip: string,
 ): { allowed: boolean; retryAfter?: number } {
@@ -121,9 +128,6 @@ export function checkDohRateLimit(
 }
 
 // --- Login Brute-force Protection (5 attempts / 5 mins, Lockout 15 mins) ---
-const MAX_LOGIN_FAILURES = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 phút
-
 export function checkLoginRateLimit(
   ip: string,
 ): { allowed: boolean; retryAfter?: number } {
@@ -180,9 +184,6 @@ export function recordSyncTriggered(): void {
 }
 
 // --- General API Rate Limiting (120 req/min) ---
-const API_REFILL_RATE = 2; // 2 req/s (~120/min)
-const API_MAX_BURST = 30;
-
 export function checkApiRateLimit(
   ip: string,
 ): { allowed: boolean; retryAfter?: number } {
@@ -218,7 +219,7 @@ setInterval(() => {
     if (a.lockedUntil > 0 && a.lockedUntil < now) loginAttempts.delete(ip);
   }
   rateLimitMetrics.activeTrackedIps = dohBuckets.size;
-}, 120_000);
+}, SWEEP_INTERVAL_MS);
 
 export function getRateLimitStats() {
   return {

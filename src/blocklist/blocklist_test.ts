@@ -1,13 +1,13 @@
 import { assert, assertEquals } from "@std/assert";
+import type { BlocklistManifest } from "../types/index.ts";
 import {
-  BlocklistManifest,
-  BlocklistStore,
   buildDomainSet,
   chunkDomains,
   chunkKey,
   MANIFEST_KEY,
   writeBlocklistSnapshot,
-} from "./blocklist.ts";
+} from "./snapshot.ts";
+import { BlocklistStore } from "./store.ts";
 
 const TWO_MIB = 2 * 1024 * 1024;
 

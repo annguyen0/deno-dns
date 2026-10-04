@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { openKv, resetKv } from "./kv.ts";
+import { openKv, resetKv } from "./kv/index.ts";
 import {
   addCustomBlocklist,
   addWhitelist,
@@ -12,10 +12,10 @@ import {
   setRewrite,
   syncBlocklists,
 } from "./storage.ts";
-import { counters, resetCounters } from "./counters.ts";
-import { blocklistStore } from "./blocklist.ts";
-import { upstreamCatalog } from "./upstreams.ts";
-import { BlocklistManifest, MANIFEST_KEY } from "./blocklist.ts";
+import { counters, resetCounters } from "./counters/counter.ts";
+import { blocklistStore } from "./blocklist/store.ts";
+import { upstreamCatalog } from "./upstream/catalog.ts";
+import { BlocklistManifest, MANIFEST_KEY } from "./blocklist/snapshot.ts";
 
 // Moi test file chay trong rieng 1 isolate (singleton an toan giua cac file),
 // nhung cac test TRONG mot file chia se module state (kv cache, counters,

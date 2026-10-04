@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { assertSafeFetchUrl, UnsafeUrlError } from "./ssrf.ts";
+import { assertSafeFetchUrl, UnsafeUrlError } from "./guard.ts";
 
 Deno.test("ssrf: URL https hop le → giu nguyen", () => {
   assertEquals(

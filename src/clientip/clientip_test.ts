@@ -4,7 +4,7 @@ import {
   isPrivateOrLoopbackIp,
   isValidIp,
   parsePlatformHeader,
-} from "./clientip.ts";
+} from "./trust.ts";
 
 function reqWithHeaders(headers: Record<string, string>): Request {
   return new Request("https://example.com/dns-query", { headers });

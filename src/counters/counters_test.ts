@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { LOG_RING_SIZE, QueryCounters } from "./counters.ts";
+import { LOG_RING_SIZE } from "./constants.ts";
+import { QueryCounters } from "./counter.ts";
 
 async function stats(kv: Deno.Kv) {
   const total = await kv.get<Deno.KvU64>(["stats", "total"]);

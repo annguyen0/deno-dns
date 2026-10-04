@@ -9,13 +9,8 @@
 // ten domen cong khai (github raw, oisd.nl...). Nền tang Deno Deploy cung co the
 // chan fetch vao range private (residual risk duoc ghi nhan).
 
-import { isPrivateOrLoopbackIp, isValidIp } from "./clientip.ts";
-
-const BLOCKED_HOSTS = new Set([
-  "localhost",
-  "metadata",
-  "metadata.google.internal",
-]);
+import { isPrivateOrLoopbackIp, isValidIp } from "../clientip/trust.ts";
+import { BLOCKED_HOST_SUFFIXES, BLOCKED_HOSTS } from "./constants.ts";
 
 export class UnsafeUrlError extends Error {}
 
@@ -33,9 +28,7 @@ export function assertSafeFetchUrl(raw: string): string {
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (
     BLOCKED_HOSTS.has(host) ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal") ||
-    host.endsWith(".lan")
+    BLOCKED_HOST_SUFFIXES.some((s) => host.endsWith(s))
   ) {
     throw new UnsafeUrlError("Hostname nội bộ không được phép");
   }

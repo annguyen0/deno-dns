@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { checkApiRateLimit, checkDohRateLimit, LruMap } from "./ratelimit.ts";
+import { checkApiRateLimit, checkDohRateLimit, LruMap } from "./limiter.ts";
 
 Deno.test("LruMap: evict LRU khi het capacity", () => {
   const m = new LruMap<string, number>(3);

@@ -1,6 +1,6 @@
-import { getKv } from "./kv.ts";
-
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 ngày
+import { getKv } from "../kv/index.ts";
+import { AUTH_PASSWORD_KEY, sessionKey } from "../kv/schema.ts";
+import { PBKDF2_ITERATIONS, SESSION_TTL_MS } from "./constants.ts";
 
 // --- PBKDF2 Password Hashing ---
 
@@ -19,7 +19,7 @@ export async function hashPassword(password: string): Promise<string> {
     {
       name: "PBKDF2",
       salt,
-      iterations: 100_000,
+      iterations: PBKDF2_ITERATIONS,
       hash: "SHA-256",
     },
     passwordKey,
@@ -62,7 +62,7 @@ export async function verifyPassword(
       {
         name: "PBKDF2",
         salt,
-        iterations: 100_000,
+        iterations: PBKDF2_ITERATIONS,
         hash: "SHA-256",
       },
       passwordKey,
@@ -86,7 +86,7 @@ export async function isSetupNeeded(): Promise<boolean> {
   if (envPassword && envPassword.trim().length > 0) {
     return false;
   }
-  const stored = await getKv().get<string>(["auth", "password_hash"]);
+  const stored = await getKv().get<string>(AUTH_PASSWORD_KEY);
   return !stored.value;
 }
 
@@ -96,7 +96,7 @@ export async function checkAdminPassword(password: string): Promise<boolean> {
     return password === envPassword.trim();
   }
 
-  const stored = await getKv().get<string>(["auth", "password_hash"]);
+  const stored = await getKv().get<string>(AUTH_PASSWORD_KEY);
   if (!stored.value) {
     return false;
   }
@@ -106,7 +106,7 @@ export async function checkAdminPassword(password: string): Promise<boolean> {
 
 export async function setAdminPassword(password: string): Promise<void> {
   const hash = await hashPassword(password);
-  await getKv().set(["auth", "password_hash"], hash);
+  await getKv().set(AUTH_PASSWORD_KEY, hash);
 }
 
 // --- Session Management ---
@@ -116,7 +116,7 @@ export async function createSession(): Promise<
 > {
   const sessionId = crypto.randomUUID();
   const expiresAt = Date.now() + SESSION_TTL_MS;
-  await getKv().set(["sessions", sessionId], { expiresAt }, {
+  await getKv().set(sessionKey(sessionId), { expiresAt }, {
     expireIn: SESSION_TTL_MS,
   });
   return { sessionId, expiresAt };
@@ -126,13 +126,12 @@ export async function verifySession(
   sessionId: string | null,
 ): Promise<boolean> {
   if (!sessionId) return false;
-  const session = await getKv().get<{ expiresAt: number }>([
-    "sessions",
-    sessionId,
-  ]);
+  const session = await getKv().get<{ expiresAt: number }>(
+    sessionKey(sessionId),
+  );
   if (!session.value) return false;
   if (session.value.expiresAt < Date.now()) {
-    await getKv().delete(["sessions", sessionId]);
+    await getKv().delete(sessionKey(sessionId));
     return false;
   }
   return true;
@@ -140,7 +139,7 @@ export async function verifySession(
 
 export async function deleteSession(sessionId: string | null): Promise<void> {
   if (!sessionId) return;
-  await getKv().delete(["sessions", sessionId]);
+  await getKv().delete(sessionKey(sessionId));
 }
 
 // Helper to extract session ID from request (cookie or Bearer header)

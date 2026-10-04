@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { UpstreamItem } from "./catalog.ts";
-import { UpstreamCatalogCache } from "./upstreams.ts";
+import { UpstreamItem } from "../types/index.ts";
+import { UpstreamCatalogCache } from "./catalog.ts";
 
 const CATALOG: UpstreamItem[] = [
   {

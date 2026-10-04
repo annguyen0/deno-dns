@@ -1,40 +1,46 @@
-import {
+import type {
   BlocklistItem,
+  BlocklistManifest,
+  CustomRewrite,
+  UpstreamItem,
+} from "./types/index.ts";
+import { getKv, openKv } from "./kv/index.ts";
+import {
+  CONFIG_KEYS,
+  rewriteKey,
+  REWRITES_PREFIX,
+  STATS_KEYS,
+  WHITELIST_PREFIX,
+  whitelistKey,
+} from "./kv/schema.ts";
+import { blocklistStore } from "./blocklist/store.ts";
+import { MANIFEST_KEY, writeBlocklistSnapshot } from "./blocklist/snapshot.ts";
+import {
   DEFAULT_BLOCKLISTS,
   DEFAULT_UPSTREAMS,
-  UpstreamItem,
-} from "./catalog.ts";
-import { getKv, openKv } from "./kv.ts";
-import {
-  BlocklistManifest,
-  blocklistStore,
-  MANIFEST_KEY,
-  writeBlocklistSnapshot,
-} from "./blocklist.ts";
-import { upstreamCatalog } from "./upstreams.ts";
-import { counters, initCounters } from "./counters.ts";
-import { assertSafeFetchUrl, UnsafeUrlError } from "./ssrf.ts";
+  upstreamCatalog,
+} from "./upstream/catalog.ts";
+import { counters, initCounters } from "./counters/counter.ts";
+import { assertSafeFetchUrl, UnsafeUrlError } from "./ssrf/guard.ts";
+
+export type { CustomRewrite };
 
 const POLL_INTERVAL_MS = 60_000; // chu ky kiem tra manifest moi + lam moi rules/catalog
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
-
-export interface CustomRewrite {
-  domain: string;
-  ip: string;
-}
 
 // Khoi tao du lieu mac dinh + cache in-memory + timers nen
 export async function initStorage(): Promise<void> {
   const kv = await openKv();
 
   // 1. Khoi tao danh mục Upstream (giu logic migration tu config cu)
-  const upstreamsEntry = await kv.get<UpstreamItem[]>([
-    "config",
-    "upstreams_catalog",
-  ]);
+  const upstreamsEntry = await getKv().get<UpstreamItem[]>(
+    CONFIG_KEYS.upstreamsCatalog,
+  );
   if (!upstreamsEntry.value) {
-    const oldUpstreams = await kv.get<string[]>(["config", "upstreams"]);
+    const oldUpstreams = await getKv().get<string[]>(
+      CONFIG_KEYS.upstreamsLegacy,
+    );
     if (oldUpstreams.value && Array.isArray(oldUpstreams.value)) {
       const merged = DEFAULT_UPSTREAMS.map((u) => ({
         ...u,
@@ -54,9 +60,9 @@ export async function initStorage(): Promise<void> {
           });
         }
       }
-      await kv.set(["config", "upstreams_catalog"], merged);
+      await kv.set(CONFIG_KEYS.upstreamsCatalog, merged);
     } else {
-      await kv.set(["config", "upstreams_catalog"], DEFAULT_UPSTREAMS);
+      await kv.set(CONFIG_KEYS.upstreamsCatalog, DEFAULT_UPSTREAMS);
     }
   } else {
     const existing = upstreamsEntry.value;
@@ -69,29 +75,28 @@ export async function initStorage(): Promise<void> {
       }
     }
     if (hasNew) {
-      await kv.set(["config", "upstreams_catalog"], existing);
+      await kv.set(CONFIG_KEYS.upstreamsCatalog, existing);
     }
   }
 
   // 2. Khoi tao danh mục Blocklist
-  const blocklistsEntry = await kv.get<BlocklistItem[]>([
-    "config",
-    "blocklists_catalog",
-  ]);
+  const blocklistsEntry = await kv.get<BlocklistItem[]>(
+    CONFIG_KEYS.blocklistsCatalog,
+  );
   if (!blocklistsEntry.value) {
-    await kv.set(["config", "blocklists_catalog"], DEFAULT_BLOCKLISTS);
+    await kv.set(CONFIG_KEYS.blocklistsCatalog, DEFAULT_BLOCKLISTS);
   }
 
   // 3. Khoi tao cac khoa so counter (Deno.KvU64) neu chua co
-  for (const key of ["total", "blocked", "allowed"]) {
-    const entry = await kv.get(["stats", key]);
+  for (const key of ["total", "blocked", "allowed"] as const) {
+    const entry = await kv.get(STATS_KEYS[key]);
     if (!entry.value || !(entry.value instanceof Deno.KvU64)) {
       const initialVal = typeof entry.value === "bigint"
         ? entry.value
         : typeof entry.value === "number"
         ? BigInt(entry.value)
         : 0n;
-      await kv.set(["stats", key], new Deno.KvU64(initialVal));
+      await kv.set(STATS_KEYS[key], new Deno.KvU64(initialVal));
     }
   }
 
@@ -161,10 +166,10 @@ function parseKvU64(val: unknown): number {
 
 export async function getStats() {
   const kv = getKv();
-  const totalRes = await kv.get<Deno.KvU64>(["stats", "total"]);
-  const blockedRes = await kv.get<Deno.KvU64>(["stats", "blocked"]);
-  const allowedRes = await kv.get<Deno.KvU64>(["stats", "allowed"]);
-  const countRes = await kv.get<number>(["config", "total_blocked_count"]);
+  const totalRes = await kv.get<Deno.KvU64>(STATS_KEYS.total);
+  const blockedRes = await kv.get<Deno.KvU64>(STATS_KEYS.blocked);
+  const allowedRes = await kv.get<Deno.KvU64>(STATS_KEYS.allowed);
+  const countRes = await kv.get<number>(CONFIG_KEYS.totalBlockedCount);
 
   const total = parseKvU64(totalRes.value);
   const blocked = parseKvU64(blockedRes.value);
@@ -187,10 +192,9 @@ export async function getStats() {
 // --- Upstream Catalog APIs ---
 
 export async function getUpstreamsCatalog(): Promise<UpstreamItem[]> {
-  const entry = await getKv().get<UpstreamItem[]>([
-    "config",
-    "upstreams_catalog",
-  ]);
+  const entry = await getKv().get<UpstreamItem[]>(
+    CONFIG_KEYS.upstreamsCatalog,
+  );
   return entry.value || DEFAULT_UPSTREAMS;
 }
 
@@ -201,7 +205,7 @@ export async function toggleUpstream(
   const kv = getKv();
   const catalog = await getUpstreamsCatalog();
   const updated = catalog.map((u) => (u.id === id ? { ...u, enabled } : u));
-  await kv.set(["config", "upstreams_catalog"], updated);
+  await kv.set(CONFIG_KEYS.upstreamsCatalog, updated);
   upstreamCatalog.setItems(updated);
 }
 
@@ -223,7 +227,7 @@ export async function addCustomUpstream(
     isCustom: true,
   };
   catalog.push(newItem);
-  await kv.set(["config", "upstreams_catalog"], catalog);
+  await kv.set(CONFIG_KEYS.upstreamsCatalog, catalog);
   upstreamCatalog.setItems(catalog);
   return newItem;
 }
@@ -232,17 +236,16 @@ export async function removeUpstream(id: string): Promise<void> {
   const kv = getKv();
   const catalog = await getUpstreamsCatalog();
   const updated = catalog.filter((u) => u.id !== id);
-  await kv.set(["config", "upstreams_catalog"], updated);
+  await kv.set(CONFIG_KEYS.upstreamsCatalog, updated);
   upstreamCatalog.setItems(updated);
 }
 
 // --- Blocklist Catalog APIs ---
 
 export async function getBlocklistsCatalog(): Promise<BlocklistItem[]> {
-  const entry = await getKv().get<BlocklistItem[]>([
-    "config",
-    "blocklists_catalog",
-  ]);
+  const entry = await getKv().get<BlocklistItem[]>(
+    CONFIG_KEYS.blocklistsCatalog,
+  );
   return entry.value || DEFAULT_BLOCKLISTS;
 }
 
@@ -258,7 +261,7 @@ export async function toggleBlocklist(
   const kv = getKv();
   const catalog = await getBlocklistsCatalog();
   const updated = catalog.map((b) => (b.id === id ? { ...b, enabled } : b));
-  await kv.set(["config", "blocklists_catalog"], updated);
+  await kv.set(CONFIG_KEYS.blocklistsCatalog, updated);
 }
 
 export async function addCustomBlocklist(
@@ -280,7 +283,7 @@ export async function addCustomBlocklist(
     isCustom: true,
   };
   catalog.push(newItem);
-  await kv.set(["config", "blocklists_catalog"], catalog);
+  await kv.set(CONFIG_KEYS.blocklistsCatalog, catalog);
   return newItem;
 }
 
@@ -288,14 +291,14 @@ export async function removeBlocklist(id: string): Promise<void> {
   const kv = getKv();
   const catalog = await getBlocklistsCatalog();
   const updated = catalog.filter((b) => b.id !== id);
-  await kv.set(["config", "blocklists_catalog"], updated);
+  await kv.set(CONFIG_KEYS.blocklistsCatalog, updated);
 }
 
 // --- Whitelist (KV theo tung key; hot path doc qua Set in-memory) ---
 
 export async function getWhitelist(): Promise<string[]> {
   const list: string[] = [];
-  for await (const entry of getKv().list({ prefix: ["whitelist"] })) {
+  for await (const entry of getKv().list({ prefix: WHITELIST_PREFIX })) {
     list.push(entry.key[1] as string);
   }
   return list;
@@ -303,13 +306,13 @@ export async function getWhitelist(): Promise<string[]> {
 
 export async function addWhitelist(domain: string) {
   const kv = getKv();
-  await kv.set(["whitelist", normalizeDomain(domain)], true);
+  await kv.set(whitelistKey(normalizeDomain(domain)), true);
   await blocklistStore.refreshRules(kv);
 }
 
 export async function removeWhitelist(domain: string) {
   const kv = getKv();
-  await kv.delete(["whitelist", normalizeDomain(domain)]);
+  await kv.delete(whitelistKey(normalizeDomain(domain)));
   await blocklistStore.refreshRules(kv);
 }
 
@@ -317,7 +320,7 @@ export async function removeWhitelist(domain: string) {
 
 export async function getRewrites(): Promise<CustomRewrite[]> {
   const rewrites: CustomRewrite[] = [];
-  for await (const entry of getKv().list({ prefix: ["rewrites"] })) {
+  for await (const entry of getKv().list({ prefix: REWRITES_PREFIX })) {
     rewrites.push({
       domain: entry.key[1] as string,
       ip: entry.value as string,
@@ -328,13 +331,13 @@ export async function getRewrites(): Promise<CustomRewrite[]> {
 
 export async function setRewrite(domain: string, ip: string) {
   const kv = getKv();
-  await kv.set(["rewrites", normalizeDomain(domain)], ip.trim());
+  await kv.set(rewriteKey(normalizeDomain(domain)), ip.trim());
   await blocklistStore.refreshRules(kv);
 }
 
 export async function removeRewrite(domain: string) {
   const kv = getKv();
-  await kv.delete(["rewrites", normalizeDomain(domain)]);
+  await kv.delete(rewriteKey(normalizeDomain(domain)));
   await blocklistStore.refreshRules(kv);
 }
 
@@ -415,8 +418,8 @@ export async function syncBlocklists(): Promise<{
   const oldManifest = (await kv.get<BlocklistManifest>(MANIFEST_KEY)).value;
   const manifest = await writeBlocklistSnapshot(kv, domains, oldManifest);
 
-  await kv.set(["config", "blocklists_catalog"], catalog);
-  await kv.set(["config", "total_blocked_count"], domains.size);
+  await kv.set(CONFIG_KEYS.blocklistsCatalog, catalog);
+  await kv.set(CONFIG_KEYS.totalBlockedCount, domains.size);
 
   // Instance hien tai ap dung ngay (khong cho chu ky poll 60s)
   await blocklistStore.refresh(kv);

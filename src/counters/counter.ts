@@ -10,33 +10,17 @@
 //   dashboard cung hien thi thong so delta (localDelta) rieng.
 //
 // Log per-request: BO luu KV (nha NVN + privacy). Thay bang ring buffer 50 muc
-// in-memory per-instance cho dashboard (loi ro: "cua instance nay, khong phai toan cuc").
+// in-memory per-instance (src/counters/logring.ts).
 
-export type QueryStatus = "ALLOWED" | "BLOCKED" | "WHITELISTED" | "REWRITE";
-
-export interface LogEntry {
-  time: string;
-  domain: string;
-  status: QueryStatus;
-  clientIp: string;
-}
-
-export interface LocalDelta {
-  total: number;
-  blocked: number;
-  allowed: number;
-}
-
-export const FLUSH_INTERVAL_MS = 30_000;
-export const FLUSH_DELTA_THRESHOLD = 10_000;
-export const LOG_RING_SIZE = 50;
+import type { LocalDelta, QueryStatus } from "../types/index.ts";
+import { STATS_KEYS } from "../kv/schema.ts";
+import { FLUSH_DELTA_THRESHOLD, FLUSH_INTERVAL_MS } from "./constants.ts";
+import { LogRing } from "./logring.ts";
 
 export class QueryCounters {
   #delta: LocalDelta = { total: 0, blocked: 0, allowed: 0 };
   #flushing: Promise<void> | null = null;
-  #logs: LogEntry[] = [];
-  #logHead = 0;
-  #logCount = 0;
+  #logs = new LogRing();
   #timer: ReturnType<typeof setInterval>;
   #kv: Deno.Kv;
   #threshold: number;
@@ -68,7 +52,7 @@ export class QueryCounters {
     } else {
       this.#delta.allowed++;
     }
-    this.#pushLog({
+    this.#logs.push({
       time: new Date().toISOString(),
       domain,
       status,
@@ -76,17 +60,6 @@ export class QueryCounters {
     });
     if (this.#delta.total >= this.#threshold) {
       void this.flush();
-    }
-  }
-
-  #pushLog(entry: LogEntry): void {
-    if (this.#logCount < LOG_RING_SIZE) {
-      this.#logs[this.#logHead] = entry;
-      this.#logHead = (this.#logHead + 1) % LOG_RING_SIZE;
-      this.#logCount++;
-    } else {
-      this.#logs[this.#logHead] = entry;
-      this.#logHead = (this.#logHead + 1) % LOG_RING_SIZE;
     }
   }
 
@@ -103,9 +76,9 @@ export class QueryCounters {
     this.#flushing = (async () => {
       await this.#kv
         .atomic()
-        .sum(["stats", "total"], BigInt(d.total))
-        .sum(["stats", "blocked"], BigInt(d.blocked))
-        .sum(["stats", "allowed"], BigInt(d.allowed))
+        .sum(STATS_KEYS.total, BigInt(d.total))
+        .sum(STATS_KEYS.blocked, BigInt(d.blocked))
+        .sum(STATS_KEYS.allowed, BigInt(d.allowed))
         .commit();
     })().finally(() => {
       this.#flushing = null;
@@ -119,15 +92,8 @@ export class QueryCounters {
   }
 
   /** Ring buffer log: 50 muc moi nhat, moi nhat truoc (giong thu cu cua dashboard). */
-  getLogs(): LogEntry[] {
-    if (this.#logCount === 0) return [];
-    const out: LogEntry[] = [];
-    for (let i = 0; i < this.#logCount; i++) {
-      out.push(
-        this.#logs[(this.#logHead - 1 - i + LOG_RING_SIZE * 2) % LOG_RING_SIZE],
-      );
-    }
-    return out;
+  getLogs() {
+    return this.#logs.toArray();
   }
 
   /** Test/shutdown: dung timer. */
