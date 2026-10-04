@@ -1,4 +1,4 @@
-const kv = await Deno.openKv();
+import { getKv } from "./kv.ts";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 ngày
 
@@ -12,7 +12,7 @@ export async function hashPassword(password: string): Promise<string> {
     encoder.encode(password),
     { name: "PBKDF2" },
     false,
-    ["deriveBits"]
+    ["deriveBits"],
   );
 
   const keyBuffer = await crypto.subtle.deriveBits(
@@ -23,7 +23,7 @@ export async function hashPassword(password: string): Promise<string> {
       hash: "SHA-256",
     },
     passwordKey,
-    256
+    256,
   );
 
   const saltHex = Array.from(salt)
@@ -38,7 +38,7 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(
   password: string,
-  stored: string
+  stored: string,
 ): Promise<boolean> {
   try {
     const parts = stored.split(":");
@@ -46,7 +46,7 @@ export async function verifyPassword(
     const [saltHex, expectedHash] = parts;
 
     const salt = new Uint8Array(
-      saltHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
+      saltHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)),
     );
 
     const encoder = new TextEncoder();
@@ -55,7 +55,7 @@ export async function verifyPassword(
       encoder.encode(password),
       { name: "PBKDF2" },
       false,
-      ["deriveBits"]
+      ["deriveBits"],
     );
 
     const keyBuffer = await crypto.subtle.deriveBits(
@@ -66,7 +66,7 @@ export async function verifyPassword(
         hash: "SHA-256",
       },
       passwordKey,
-      256
+      256,
     );
 
     const actualHash = Array.from(new Uint8Array(keyBuffer))
@@ -86,7 +86,7 @@ export async function isSetupNeeded(): Promise<boolean> {
   if (envPassword && envPassword.trim().length > 0) {
     return false;
   }
-  const stored = await kv.get<string>(["auth", "password_hash"]);
+  const stored = await getKv().get<string>(["auth", "password_hash"]);
   return !stored.value;
 }
 
@@ -96,7 +96,7 @@ export async function checkAdminPassword(password: string): Promise<boolean> {
     return password === envPassword.trim();
   }
 
-  const stored = await kv.get<string>(["auth", "password_hash"]);
+  const stored = await getKv().get<string>(["auth", "password_hash"]);
   if (!stored.value) {
     return false;
   }
@@ -106,24 +106,33 @@ export async function checkAdminPassword(password: string): Promise<boolean> {
 
 export async function setAdminPassword(password: string): Promise<void> {
   const hash = await hashPassword(password);
-  await kv.set(["auth", "password_hash"], hash);
+  await getKv().set(["auth", "password_hash"], hash);
 }
 
 // --- Session Management ---
 
-export async function createSession(): Promise<{ sessionId: string; expiresAt: number }> {
+export async function createSession(): Promise<
+  { sessionId: string; expiresAt: number }
+> {
   const sessionId = crypto.randomUUID();
   const expiresAt = Date.now() + SESSION_TTL_MS;
-  await kv.set(["sessions", sessionId], { expiresAt }, { expireIn: SESSION_TTL_MS });
+  await getKv().set(["sessions", sessionId], { expiresAt }, {
+    expireIn: SESSION_TTL_MS,
+  });
   return { sessionId, expiresAt };
 }
 
-export async function verifySession(sessionId: string | null): Promise<boolean> {
+export async function verifySession(
+  sessionId: string | null,
+): Promise<boolean> {
   if (!sessionId) return false;
-  const session = await kv.get<{ expiresAt: number }>(["sessions", sessionId]);
+  const session = await getKv().get<{ expiresAt: number }>([
+    "sessions",
+    sessionId,
+  ]);
   if (!session.value) return false;
   if (session.value.expiresAt < Date.now()) {
-    await kv.delete(["sessions", sessionId]);
+    await getKv().delete(["sessions", sessionId]);
     return false;
   }
   return true;
@@ -131,7 +140,7 @@ export async function verifySession(sessionId: string | null): Promise<boolean> 
 
 export async function deleteSession(sessionId: string | null): Promise<void> {
   if (!sessionId) return;
-  await kv.delete(["sessions", sessionId]);
+  await getKv().delete(["sessions", sessionId]);
 }
 
 // Helper to extract session ID from request (cookie or Bearer header)

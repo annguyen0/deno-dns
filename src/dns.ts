@@ -1,13 +1,14 @@
 import { Buffer } from "node:buffer";
 import dnsPacket from "dns-packet";
 import { checkDohRateLimit } from "./ratelimit.ts";
+import { getClientInfo } from "./clientip.ts";
 import {
   getActiveUpstreamUrls,
   getRewriteIP,
   isBlocked,
   isWhitelisted,
-  recordStat,
 } from "./storage.ts";
+import { counters } from "./counters.ts";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,18 +30,33 @@ function decodeBase64Url(str: string): Buffer | null {
   }
 }
 
-async function forwardToUpstream(rawQuery: Buffer): Promise<Response> {
-  const upstreams = await getActiveUpstreamUrls();
+// Forward tới upstream theo thuan tu (ADR-3). KHONG chuyen tiep header client gui
+// (XFF/X-Real-IP) — chi append x-forwarded-for duy nhat tu IP dang tin nen tang.
+async function forwardToUpstream(
+  rawQuery: Buffer,
+  upstreams: string[],
+  trustedClientIp: string | null,
+): Promise<Response> {
+  const xffHeader: string | null = trustedClientIp ? trustedClientIp : null;
 
   for (const upstream of upstreams) {
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/dns-message",
+        "Accept": "application/dns-message",
+      };
+      if (xffHeader) headers["x-forwarded-for"] = xffHeader;
+
       const res = await fetch(upstream, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/dns-message",
-          "Accept": "application/dns-message",
-        },
-        body: rawQuery,
+        headers,
+        // View dung kich cho byteLength (khong lay Buffer raw — Buffer co the
+        // chung pool alloc lon hon; cast ArrayBuffer vi TS typed-array generics)
+        body: new Uint8Array(
+          rawQuery.buffer as ArrayBuffer,
+          rawQuery.byteOffset,
+          rawQuery.byteLength,
+        ),
         signal: AbortSignal.timeout(3000), // Timeout 3s tránh treo worker
       });
 
@@ -60,26 +76,26 @@ async function forwardToUpstream(rawQuery: Buffer): Promise<Response> {
     }
   }
 
-  return new Response("Upstream DNS Error", { status: 502, headers: corsHeaders });
+  return new Response("Upstream DNS Error", {
+    status: 502,
+    headers: corsHeaders,
+  });
 }
 
 export async function handleDNSQuery(
   req: Request,
-  info?: Deno.ServeHandlerInfo
+  info?: Deno.ServeHandlerInfo,
 ): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const clientIp =
-    req.headers.get("cf-connecting-ip") ||
-    req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-    info?.remoteAddr?.hostname ||
-    "127.0.0.1";
+  // IP client + region node: chi tin nen tang (plan §5.2)
+  const client = getClientInfo(req, info);
+  const rateLimitKey = client.ip ?? "unknown";
 
   // --- DDoS & Rate Limiting Check (Token Bucket 60 req/s, Burst 120) ---
-  const rateLimit = checkDohRateLimit(clientIp);
+  const rateLimit = checkDohRateLimit(rateLimitKey);
   if (!rateLimit.allowed) {
     return new Response("Too Many DNS Requests", {
       status: 429,
@@ -108,7 +124,7 @@ export async function handleDNSQuery(
             id: Math.floor(Math.random() * 65535),
             flags: dnsPacket.RECURSION_DESIRED,
             questions: [{ type: type as "A" | "AAAA", name }],
-          })
+          }),
         );
       } catch {
         rawQuery = null;
@@ -116,7 +132,10 @@ export async function handleDNSQuery(
     } else {
       return new Response("DoH Server Active", {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/plain; charset=utf-8",
+        },
       });
     }
   } else if (req.method === "POST") {
@@ -159,17 +178,23 @@ export async function handleDNSQuery(
     console.warn("Lỗi phân tích DNS packet:", err);
   }
 
+  const logIp = client.ip ?? "unknown";
+
   if (domain && query && question) {
-    // 1. Kiểm tra Whitelist
+    // 1. Kiểm tra Whitelist (in-memory, 0 KV op)
     if (await isWhitelisted(domain)) {
-      await recordStat(domain, "WHITELISTED", clientIp);
-      return await forwardToUpstream(rawQuery);
+      counters().record(domain, "WHITELISTED", logIp);
+      return await forwardToUpstream(
+        rawQuery,
+        await getActiveUpstreamUrls(client.nodeRegion),
+        client.ip,
+      );
     }
 
     // 2. Kiểm tra Custom Rewrites (Local DNS)
     const customIp = await getRewriteIP(domain);
     if (customIp) {
-      await recordStat(domain, "REWRITE", clientIp);
+      counters().record(domain, "REWRITE", logIp);
       const isIpv6 = customIp.includes(":");
       const qType = question.type || "A";
 
@@ -186,7 +211,8 @@ export async function handleDNSQuery(
       const rewritePacket = dnsPacket.encode({
         type: "response",
         id: query.id,
-        flags: dnsPacket.AUTHORITATIVE_ANSWER | (query.flags & dnsPacket.RECURSION_DESIRED),
+        flags: dnsPacket.AUTHORITATIVE_ANSWER |
+          (query.flags & dnsPacket.RECURSION_DESIRED),
         questions: query.questions,
         answers,
       });
@@ -201,15 +227,16 @@ export async function handleDNSQuery(
       });
     }
 
-    // 3. Kiểm tra Blocklist
+    // 3. Kiểm tra Blocklist (in-memory, 0 KV op)
     if (await isBlocked(domain)) {
-      await recordStat(domain, "BLOCKED", clientIp);
+      counters().record(domain, "BLOCKED", logIp);
       const qType = question.type || "A";
       const blockedData = qType === "AAAA" ? "::" : "0.0.0.0";
       const blockedPacket = dnsPacket.encode({
         type: "response",
         id: query.id,
-        flags: dnsPacket.AUTHORITATIVE_ANSWER | (query.flags & dnsPacket.RECURSION_DESIRED),
+        flags: dnsPacket.AUTHORITATIVE_ANSWER |
+          (query.flags & dnsPacket.RECURSION_DESIRED),
         questions: query.questions,
         answers: [{
           type: (qType as "A" | "AAAA") || "A",
@@ -230,16 +257,20 @@ export async function handleDNSQuery(
     }
   }
 
-  // 4. Cho phép và chuyển tiếp tới Upstream
-  await recordStat(domain || "(unknown)", "ALLOWED", clientIp);
-
-  const upstreamRes = await forwardToUpstream(rawQuery);
+  // 4. Cho phép và chuyển tiếp tới Upstream (thuan tu theo region node)
+  counters().record(domain || "(unknown)", "ALLOWED", logIp);
+  const upstreamRes = await forwardToUpstream(
+    rawQuery,
+    await getActiveUpstreamUrls(client.nodeRegion),
+    client.ip,
+  );
 
   // Nếu client là trình duyệt/JSON tool yêu cầu DNS JSON
   const acceptHeader = req.headers.get("accept") || "";
   if (
     acceptHeader.includes("application/dns-json") ||
-    (url.searchParams.has("name") && !acceptHeader.includes("application/dns-message"))
+    (url.searchParams.has("name") &&
+      !acceptHeader.includes("application/dns-message"))
   ) {
     try {
       const arrayBuf = await upstreamRes.arrayBuffer();

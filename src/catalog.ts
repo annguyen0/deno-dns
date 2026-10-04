@@ -27,7 +27,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "cloudflare",
     name: "Cloudflare (1.1.1.1)",
     url: "https://1.1.1.1/dns-query",
-    description: "Phân giải nhanh nhất thế giới, Anycast toàn cầu, không lưu IP người dùng.",
+    description:
+      "Phân giải nhanh nhất thế giới, Anycast toàn cầu, không lưu IP người dùng.",
     tag: "speed",
     tagLabel: "⚡ Tốc độ",
     enabled: true,
@@ -36,7 +37,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "google",
     name: "Google Public DNS",
     url: "https://dns.google/dns-query",
-    description: "Hạ tầng ổn định từ Google, DNSSEC đầy đủ, hỗ trợ chuẩn RFC 8484.",
+    description:
+      "Hạ tầng ổn định từ Google, DNSSEC đầy đủ, hỗ trợ chuẩn RFC 8484.",
     tag: "speed",
     tagLabel: "⚡ Tốc độ",
     enabled: true,
@@ -45,7 +47,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "opendns",
     name: "Cisco Umbrella (OpenDNS)",
     url: "https://doh.opendns.com/dns-query",
-    description: "Dịch vụ DNS Anycast danh tiếng từ Cisco, độ tin cậy và hiệu năng cao.",
+    description:
+      "Dịch vụ DNS Anycast danh tiếng từ Cisco, độ tin cậy và hiệu năng cao.",
     tag: "speed",
     tagLabel: "⚡ Tốc độ",
     enabled: false,
@@ -54,7 +57,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "dnssb",
     name: "DNS.SB",
     url: "https://doh.dns.sb/dns-query",
-    description: "Hỗ trợ DNSSEC, QNAME minimization, cam kết không ghi nhật ký.",
+    description:
+      "Hỗ trợ DNSSEC, QNAME minimization, cam kết không ghi nhật ký.",
     tag: "speed",
     tagLabel: "⚡ Tốc độ",
     enabled: false,
@@ -65,7 +69,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "quad9",
     name: "Quad9 (9.9.9.9)",
     url: "https://dns.quad9.net/dns-query",
-    description: "Tổ chức phi lợi nhuận Thụy Sĩ, tự động chặn domain mã độc & lừa đảo theo thời gian thực.",
+    description:
+      "Tổ chức phi lợi nhuận Thụy Sĩ, tự động chặn domain mã độc & lừa đảo theo thời gian thực.",
     tag: "security",
     tagLabel: "🛡️ Bảo mật",
     enabled: false,
@@ -74,7 +79,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "cloudflare-security",
     name: "Cloudflare 1.1.1.2 (Chống Malware)",
     url: "https://security.cloudflare-dns.com/dns-query",
-    description: "Tự động chặn các website phát tán mã độc, botnet và ransomware qua dữ liệu Cloudflare Radar.",
+    description:
+      "Tự động chặn các website phát tán mã độc, botnet và ransomware qua dữ liệu Cloudflare Radar.",
     tag: "security",
     tagLabel: "🛡️ Bảo mật",
     enabled: false,
@@ -83,7 +89,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "dns4eu",
     name: "DNS4EU Protective",
     url: "https://protective.joindns4.eu/dns-query",
-    description: "Sáng kiến DNS bảo mật của Liên minh Châu Âu (EU), bảo vệ người dùng khỏi mã độc.",
+    description:
+      "Sáng kiến DNS bảo mật của Liên minh Châu Âu (EU), bảo vệ người dùng khỏi mã độc.",
     tag: "security",
     tagLabel: "🛡️ Bảo mật",
     enabled: false,
@@ -92,7 +99,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "cira-shield",
     name: "CIRA Canadian Shield",
     url: "https://protected.canadianshield.cira.ca/dns-query",
-    description: "DNS bảo vệ chống phishing và phần mềm độc hại, vận hành bởi cơ quan quản trị .CA.",
+    description:
+      "DNS bảo vệ chống phishing và phần mềm độc hại, vận hành bởi cơ quan quản trị .CA.",
     tag: "security",
     tagLabel: "🛡️ Bảo mật",
     enabled: false,
@@ -103,7 +111,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "adguard",
     name: "AdGuard DNS",
     url: "https://dns.adguard-dns.com/dns-query",
-    description: "Tự động lọc quảng cáo, trình theo dõi và banner gián điệp ở cấp độ DNS.",
+    description:
+      "Tự động lọc quảng cáo, trình theo dõi và banner gián điệp ở cấp độ DNS.",
     tag: "adblock",
     tagLabel: "🛑 Chặn QC",
     enabled: false,
@@ -112,7 +121,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "controld-adblock",
     name: "Control D (Ads & Tracking)",
     url: "https://freedns.controld.com/p2",
-    description: "Chặn mã độc + quảng cáo và các mạng lưới thu thập dữ liệu người dùng.",
+    description:
+      "Chặn mã độc + quảng cáo và các mạng lưới thu thập dữ liệu người dùng.",
     tag: "adblock",
     tagLabel: "🛑 Chặn QC",
     enabled: false,
@@ -121,7 +131,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "rethinkdns",
     name: "RethinkDNS",
     url: "https://sky.rethinkdns.com/dns-query",
-    description: "Máy chủ phân giải mã nguồn mở chạy trên 200+ điểm mạng Cloudflare, không lưu log.",
+    description:
+      "Máy chủ phân giải mã nguồn mở chạy trên 200+ điểm mạng Cloudflare, không lưu log.",
     tag: "security",
     tagLabel: "🔒 Riêng tư",
     enabled: false,
@@ -130,7 +141,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "mullvad",
     name: "Mullvad DoH",
     url: "https://dns.mullvad.net/dns-query",
-    description: "Chính sách quyền riêng tư nghiêm ngặt từ nhà cung cấp VPN Mullvad Thụy Điển.",
+    description:
+      "Chính sách quyền riêng tư nghiêm ngặt từ nhà cung cấp VPN Mullvad Thụy Điển.",
     tag: "security",
     tagLabel: "🔒 Riêng tư",
     enabled: false,
@@ -139,7 +151,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "wikimedia",
     name: "Wikimedia DNS",
     url: "https://wikimedia-dns.org/dns-query",
-    description: "Vận hành bởi Quỹ Wikimedia (Wikipedia), không lọc, không ECS, bảo vệ quyền riêng tư.",
+    description:
+      "Vận hành bởi Quỹ Wikimedia (Wikipedia), không lọc, không ECS, bảo vệ quyền riêng tư.",
     tag: "security",
     tagLabel: "🔒 Riêng tư",
     enabled: false,
@@ -150,7 +163,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "cloudflare-family",
     name: "Cloudflare 1.1.1.3 (Gia đình)",
     url: "https://family.cloudflare-dns.com/dns-query",
-    description: "Chặn mã độc và lọc các trang web nội dung người lớn, cờ bạc phù hợp gia đình.",
+    description:
+      "Chặn mã độc và lọc các trang web nội dung người lớn, cờ bạc phù hợp gia đình.",
     tag: "family",
     tagLabel: "👨‍👩‍👧 Gia đình",
     enabled: false,
@@ -159,7 +173,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "cleanbrowsing",
     name: "CleanBrowsing Family",
     url: "https://doh.cleanbrowsing.org/doh/family-filter/",
-    description: "Bộ lọc nghiêm ngặt hàng đầu thế giới dành cho trường học và gia đình có trẻ nhỏ.",
+    description:
+      "Bộ lọc nghiêm ngặt hàng đầu thế giới dành cho trường học và gia đình có trẻ nhỏ.",
     tag: "family",
     tagLabel: "👨‍👩‍👧 Gia đình",
     enabled: false,
@@ -168,7 +183,8 @@ export const DEFAULT_UPSTREAMS: UpstreamItem[] = [
     id: "opendns-family",
     name: "OpenDNS FamilyShield",
     url: "https://doh.familyshield.opendns.com/dns-query",
-    description: "Tự động khóa các trang web người lớn và nội dung không phù hợp cho trẻ em.",
+    description:
+      "Tự động khóa các trang web người lớn và nội dung không phù hợp cho trẻ em.",
     tag: "family",
     tagLabel: "👨‍👩‍👧 Gia đình",
     enabled: false,
@@ -179,8 +195,10 @@ export const DEFAULT_BLOCKLISTS: BlocklistItem[] = [
   {
     id: "chongluadao",
     name: "Chống Lừa Đảo (HieuPC) 🇻🇳",
-    url: "https://raw.githubusercontent.com/chongluadao/cld-blocklist/master/domains.txt",
-    description: "Danh sách bảo vệ người dùng Việt Nam chống website giả mạo, lừa đảo tài chính.",
+    url:
+      "https://raw.githubusercontent.com/chongluadao/cld-blocklist/master/domains.txt",
+    description:
+      "Danh sách bảo vệ người dùng Việt Nam chống website giả mạo, lừa đảo tài chính.",
     category: "vn",
     categoryLabel: "🇻🇳 Việt Nam",
     enabled: true,
@@ -189,7 +207,8 @@ export const DEFAULT_BLOCKLISTS: BlocklistItem[] = [
     id: "oisd",
     name: "OISD Basic",
     url: "https://basic.oisd.nl",
-    description: "Danh sách được tinh chỉnh tỉ mỉ, chặn hiệu quả và không gây lỗi trang.",
+    description:
+      "Danh sách được tinh chỉnh tỉ mỉ, chặn hiệu quả và không gây lỗi trang.",
     category: "privacy",
     categoryLabel: "⚡ Tinh gọn",
     enabled: true,
@@ -198,7 +217,8 @@ export const DEFAULT_BLOCKLISTS: BlocklistItem[] = [
     id: "stevenblack",
     name: "StevenBlack Unified",
     url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-    description: "Nguồn tổng hợp kinh điển chặn quảng cáo, tracking và phần mềm độc hại.",
+    description:
+      "Nguồn tổng hợp kinh điển chặn quảng cáo, tracking và phần mềm độc hại.",
     category: "general",
     categoryLabel: "🛡️ Toàn diện",
     enabled: true,
@@ -207,7 +227,8 @@ export const DEFAULT_BLOCKLISTS: BlocklistItem[] = [
     id: "adguard-simplified",
     name: "AdGuard DNS Filter",
     url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
-    description: "Bộ quy tắc chặn quảng cáo tối ưu hóa trực tiếp từ nhóm kỹ sư AdGuard.",
+    description:
+      "Bộ quy tắc chặn quảng cáo tối ưu hóa trực tiếp từ nhóm kỹ sư AdGuard.",
     category: "general",
     categoryLabel: "🛑 Quảng cáo",
     enabled: false,
@@ -215,8 +236,10 @@ export const DEFAULT_BLOCKLISTS: BlocklistItem[] = [
   {
     id: "urlhaus",
     name: "URLHaus Malware Filter",
-    url: "https://raw.githubusercontent.com/curbengh/urlhaus-filter/master/urlhaus-filter-hosts.txt",
-    description: "Cơ sở dữ liệu của Abuse.ch chuyên ngăn chặn máy chủ C2, botnet và ransomware.",
+    url:
+      "https://raw.githubusercontent.com/curbengh/urlhaus-filter/master/urlhaus-filter-hosts.txt",
+    description:
+      "Cơ sở dữ liệu của Abuse.ch chuyên ngăn chặn máy chủ C2, botnet và ransomware.",
     category: "malware",
     categoryLabel: "☣️ Mã độc",
     enabled: false,
@@ -224,8 +247,10 @@ export const DEFAULT_BLOCKLISTS: BlocklistItem[] = [
   {
     id: "peter-lowe",
     name: "Peter Lowe's List",
-    url: "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
-    description: "Danh sách các máy chủ quảng cáo và theo dõi danh tiếng từ năm 1996.",
+    url:
+      "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
+    description:
+      "Danh sách các máy chủ quảng cáo và theo dõi danh tiếng từ năm 1996.",
     category: "privacy",
     categoryLabel: "👁️ Tracking",
     enabled: false,
