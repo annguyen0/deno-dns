@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import dnsPacket from "dns-packet";
 import {
   getConfig,
@@ -13,20 +14,18 @@ export const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
-function decodeBase64UrlSafe(str: string): Uint8Array | null {
+function decodeBase64Url(str: string): Buffer | null {
   try {
-    let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    const s = str.trim().replace(/ /g, "+");
+    let base64 = s.replace(/-/g, "+").replace(/_/g, "/");
     while (base64.length % 4 !== 0) base64 += "=";
-    const binStr = atob(base64);
-    const bytes = new Uint8Array(binStr.length);
-    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-    return bytes;
+    return Buffer.from(base64, "base64");
   } catch {
     return null;
   }
 }
 
-async function forwardToUpstream(rawQuery: Uint8Array): Promise<Response> {
+async function forwardToUpstream(rawQuery: Buffer): Promise<Response> {
   const config = await getConfig();
   const upstreams = config.upstreams.length > 0
     ? config.upstreams
@@ -62,18 +61,37 @@ async function forwardToUpstream(rawQuery: Uint8Array): Promise<Response> {
   return new Response("Upstream DNS Error", { status: 502, headers: corsHeaders });
 }
 
-export async function handleDNSQuery(req: Request): Promise<Response> {
+export async function handleDNSQuery(
+  req: Request,
+  info?: Deno.ServeHandlerInfo
+): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const url = new URL(req.url);
-  let rawQuery: Uint8Array | null = null;
+  let rawQuery: Buffer | null = null;
 
   if (req.method === "GET") {
     const dnsParam = url.searchParams.get("dns");
-    if (dnsParam) rawQuery = decodeBase64UrlSafe(dnsParam);
-    else {
+    if (dnsParam) {
+      rawQuery = decodeBase64Url(dnsParam);
+    } else if (url.searchParams.has("name")) {
+      const name = url.searchParams.get("name")!;
+      const type = (url.searchParams.get("type") || "A").toUpperCase();
+      try {
+        rawQuery = Buffer.from(
+          dnsPacket.encode({
+            type: "query",
+            id: Math.floor(Math.random() * 65535),
+            flags: dnsPacket.RECURSION_DESIRED,
+            questions: [{ type: type as "A" | "AAAA", name }],
+          })
+        );
+      } catch {
+        rawQuery = null;
+      }
+    } else {
       return new Response("DoH Server Active", {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
@@ -81,7 +99,10 @@ export async function handleDNSQuery(req: Request): Promise<Response> {
     }
   } else if (req.method === "POST") {
     try {
-      rawQuery = new Uint8Array(await req.arrayBuffer());
+      const arrayBuf = await req.arrayBuffer();
+      if (arrayBuf.byteLength > 0) {
+        rawQuery = Buffer.from(arrayBuf);
+      }
     } catch {
       rawQuery = null;
     }
@@ -94,79 +115,117 @@ export async function handleDNSQuery(req: Request): Promise<Response> {
     });
   }
 
-  const clientIp = req.headers.get("x-forwarded-for") || "Edge";
+  const clientIp =
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    info?.remoteAddr?.hostname ||
+    "127.0.0.1";
+
   let domain = "";
+  let query: dnsPacket.Packet | null = null;
+  let question: dnsPacket.Question | null = null;
 
   try {
-    const query = dnsPacket.decode(rawQuery);
-    const question = query.questions?.[0];
-
+    query = dnsPacket.decode(rawQuery);
+    question = query.questions?.[0] ?? null;
     if (question && question.name) {
       domain = question.name.toLowerCase().replace(/\.$/, "");
-
-      // 1. Kiểm tra Whitelist
-      if (await isWhitelisted(domain)) {
-        await recordStat(domain, "WHITELISTED", clientIp);
-        return await forwardToUpstream(rawQuery);
-      }
-
-      // 2. Kiểm tra Custom Rewrites (Local DNS)
-      const customIp = await getRewriteIP(domain);
-      if (customIp) {
-        await recordStat(domain, "REWRITE", clientIp);
-        const rewritePacket = dnsPacket.encode({
-          type: "response",
-          id: query.id,
-          flags: dnsPacket.AUTHORITATIVE_ANSWER,
-          questions: query.questions,
-          answers: [{
-            type: (question.type as "A" | "AAAA") || "A",
-            name: question.name,
-            ttl: 300,
-            data: customIp,
-          }],
-        });
-
-        return new Response(rewritePacket, {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/dns-message",
-            "Cache-Control": "public, max-age=300",
-          },
-        });
-      }
-
-      // 3. Kiểm tra Blocklist
-      if (await isBlocked(domain)) {
-        await recordStat(domain, "BLOCKED", clientIp);
-        const blockedPacket = dnsPacket.encode({
-          type: "response",
-          id: query.id,
-          flags: dnsPacket.AUTHORITATIVE_ANSWER,
-          questions: query.questions,
-          answers: [{
-            type: (question.type as "A" | "AAAA") || "A",
-            name: question.name,
-            ttl: 300,
-            data: "0.0.0.0",
-          }],
-        });
-
-        return new Response(blockedPacket, {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/dns-message",
-            "Cache-Control": "public, max-age=300",
-          },
-        });
-      }
     }
-  } catch {
-    // Nếu gói tin probe nâng cao không parse được bằng dns-packet, passthrough thẳng lên Upstream
+  } catch (err) {
+    console.warn("Lỗi phân tích DNS packet:", err);
   }
 
-  if (domain) await recordStat(domain, "ALLOWED", clientIp);
-  return await forwardToUpstream(rawQuery);
+  if (domain && query && question) {
+    // 1. Kiểm tra Whitelist
+    if (await isWhitelisted(domain)) {
+      await recordStat(domain, "WHITELISTED", clientIp);
+      return await forwardToUpstream(rawQuery);
+    }
+
+    // 2. Kiểm tra Custom Rewrites (Local DNS)
+    const customIp = await getRewriteIP(domain);
+    if (customIp) {
+      await recordStat(domain, "REWRITE", clientIp);
+      const isIpv6 = customIp.includes(":");
+      const qType = question.type || "A";
+
+      const answers = [];
+      if ((qType === "A" && !isIpv6) || (qType === "AAAA" && isIpv6)) {
+        answers.push({
+          type: qType as "A" | "AAAA",
+          name: question.name,
+          ttl: 300,
+          data: customIp,
+        });
+      }
+
+      const rewritePacket = dnsPacket.encode({
+        type: "response",
+        id: query.id,
+        flags: dnsPacket.AUTHORITATIVE_ANSWER | (query.flags & dnsPacket.RECURSION_DESIRED),
+        questions: query.questions,
+        answers,
+      });
+
+      return new Response(rewritePacket, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/dns-message",
+          "Cache-Control": "public, max-age=300",
+        },
+      });
+    }
+
+    // 3. Kiểm tra Blocklist
+    if (await isBlocked(domain)) {
+      await recordStat(domain, "BLOCKED", clientIp);
+      const qType = question.type || "A";
+      const blockedData = qType === "AAAA" ? "::" : "0.0.0.0";
+      const blockedPacket = dnsPacket.encode({
+        type: "response",
+        id: query.id,
+        flags: dnsPacket.AUTHORITATIVE_ANSWER | (query.flags & dnsPacket.RECURSION_DESIRED),
+        questions: query.questions,
+        answers: [{
+          type: (qType as "A" | "AAAA") || "A",
+          name: question.name,
+          ttl: 300,
+          data: blockedData,
+        }],
+      });
+
+      return new Response(blockedPacket, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/dns-message",
+          "Cache-Control": "public, max-age=300",
+        },
+      });
+    }
+  }
+
+  // 4. Cho phép và chuyển tiếp tới Upstream
+  await recordStat(domain || "(unknown)", "ALLOWED", clientIp);
+
+  const upstreamRes = await forwardToUpstream(rawQuery);
+
+  // Nếu client là trình duyệt/JSON tool yêu cầu DNS JSON
+  const acceptHeader = req.headers.get("accept") || "";
+  if (
+    acceptHeader.includes("application/dns-json") ||
+    (url.searchParams.has("name") && !acceptHeader.includes("application/dns-message"))
+  ) {
+    try {
+      const arrayBuf = await upstreamRes.arrayBuffer();
+      const decodedRes = dnsPacket.decode(Buffer.from(arrayBuf));
+      return Response.json(decodedRes, { headers: corsHeaders });
+    } catch {
+      // Fallback nếu không decode được
+    }
+  }
+
+  return upstreamRes;
 }

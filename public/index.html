@@ -15,9 +15,14 @@
         <h1 class="text-2xl font-bold text-sky-400">⚡ Serverless DoH Dashboard</h1>
         <p class="text-slate-400 text-sm mt-1">Endpoint: <code class="bg-slate-800 text-sky-300 px-2 py-1 rounded" id="dohUrl">/dns-query</code></p>
       </div>
-      <button onclick="syncBlocklists()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition text-sm flex items-center justify-center gap-2">
-        <span>🔄 Đồng bộ Blocklist</span>
-      </button>
+      <div class="flex items-center gap-3">
+        <button onclick="testQuery()" class="bg-sky-600 hover:bg-sky-500 text-white font-medium px-4 py-2 rounded-lg transition text-sm flex items-center justify-center gap-2">
+          <span>⚡ Thử nghiệm DoH</span>
+        </button>
+        <button onclick="syncBlocklists()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition text-sm flex items-center justify-center gap-2">
+          <span>🔄 Đồng bộ Blocklist</span>
+        </button>
+      </div>
     </header>
 
     <!-- Metrics Cards -->
@@ -125,55 +130,72 @@
     }
 
     async function loadData() {
-      // Load Stats & Logs
-      const resStats = await fetch('/api/stats');
-      const stats = await resStats.json();
-      document.getElementById('stTotal').innerText = stats.total;
-      document.getElementById('stBlocked').innerText = stats.blocked;
-      document.getElementById('stAllowed').innerText = stats.allowed;
-      document.getElementById('stDomains').innerText = stats.domainCount.toLocaleString();
+      try {
+        // Load Stats & Logs
+        const resStats = await fetch('/api/stats');
+        const stats = await resStats.json();
+        document.getElementById('stTotal').innerText = stats.total ?? 0;
+        document.getElementById('stBlocked').innerText = stats.blocked ?? 0;
+        document.getElementById('stAllowed').innerText = stats.allowed ?? 0;
+        document.getElementById('stDomains').innerText = (stats.domainCount ?? 0).toLocaleString();
 
-      const tbody = document.getElementById('logsTable');
-      tbody.innerHTML = stats.logs.map(l => {
-        let statusBadge = '<span class="text-emerald-400">ALLOWED</span>';
-        if (l.status === 'BLOCKED') statusBadge = '<span class="text-rose-400 font-bold">BLOCKED</span>';
-        if (l.status === 'WHITELISTED') statusBadge = '<span class="text-emerald-300 font-bold">WHITELISTED</span>';
-        if (l.status === 'REWRITE') statusBadge = '<span class="text-amber-400 font-bold">REWRITE</span>';
-        
-        return `<tr class="hover:bg-slate-800/30"><td class="py-2 text-slate-400">${l.time}</td><td class="font-medium text-slate-200">${l.domain}</td><td>${statusBadge}</td><td class="text-slate-400">${l.clientIp}</td></tr>`;
-      }).join('');
+        const tbody = document.getElementById('logsTable');
+        if (!stats.logs || stats.logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-500">Chưa có truy vấn nào được ghi nhận</td></tr>';
+        } else {
+          tbody.innerHTML = stats.logs.map(l => {
+            let statusBadge = '<span class="text-emerald-400 font-medium">ALLOWED</span>';
+            if (l.status === 'BLOCKED') statusBadge = '<span class="text-rose-400 font-bold">BLOCKED</span>';
+            if (l.status === 'WHITELISTED') statusBadge = '<span class="text-emerald-300 font-bold">WHITELISTED</span>';
+            if (l.status === 'REWRITE') statusBadge = '<span class="text-amber-400 font-bold">REWRITE</span>';
+            
+            return `<tr class="hover:bg-slate-800/30">
+              <td class="py-2 text-slate-400 font-mono text-xs">${l.time || ''}</td>
+              <td class="font-medium text-slate-200">${l.domain || ''}</td>
+              <td>${statusBadge}</td>
+              <td class="text-slate-400 font-mono text-xs">${l.clientIp || ''}</td>
+            </tr>`;
+          }).join('');
+        }
 
-      // Config
-      const resConfig = await fetch('/api/config');
-      currentConfig = await resConfig.json();
-      renderConfig();
+        // Config
+        const resConfig = await fetch('/api/config');
+        currentConfig = await resConfig.json();
+        renderConfig();
 
-      // Whitelist & Rewrites
-      loadRules();
+        // Whitelist & Rewrites
+        loadRules();
+      } catch (err) {
+        console.error("Lỗi khi tải dữ liệu dashboard:", err);
+      }
     }
 
     function renderConfig() {
-      document.getElementById('upstreamList').innerHTML = currentConfig.upstreams.map((u, i) => 
+      document.getElementById('upstreamList').innerHTML = (currentConfig.upstreams || []).map((u, i) => 
         `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span>${u}</span><button onclick="removeUpstream(${i})" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
       ).join('');
 
-      document.getElementById('blocklistList').innerHTML = currentConfig.blocklists.map((b, i) => 
+      document.getElementById('blocklistList').innerHTML = (currentConfig.blocklists || []).map((b, i) => 
         `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span class="truncate max-w-md">${b}</span><button onclick="removeBlocklist(${i})" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
       ).join('');
     }
 
     async function loadRules() {
-      const resW = await fetch('/api/whitelist');
-      const whitelist = await resW.json();
-      document.getElementById('whitelistList').innerHTML = whitelist.map(d => 
-        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span>${d}</span><button onclick="removeWhitelist('${d}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
-      ).join('');
+      try {
+        const resW = await fetch('/api/whitelist');
+        const whitelist = await resW.json();
+        document.getElementById('whitelistList').innerHTML = (whitelist || []).map(d => 
+          `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span>${d}</span><button onclick="removeWhitelist('${d}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
+        ).join('');
 
-      const resR = await fetch('/api/rewrites');
-      const rewrites = await resR.json();
-      document.getElementById('rewriteList').innerHTML = rewrites.map(r => 
-        `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span><b>${r.domain}</b> ➔ ${r.ip}</span><button onclick="removeRewrite('${r.domain}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
-      ).join('');
+        const resR = await fetch('/api/rewrites');
+        const rewrites = await resR.json();
+        document.getElementById('rewriteList').innerHTML = (rewrites || []).map(r => 
+          `<div class="flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-700/60 text-sm"><span><b>${r.domain}</b> ➔ ${r.ip}</span><button onclick="removeRewrite('${r.domain}')" class="text-rose-400 hover:text-rose-300">Xóa</button></div>`
+        ).join('');
+      } catch (err) {
+        console.error("Lỗi khi tải danh sách whitelist/rewrites:", err);
+      }
     }
 
     async function saveConfig() {
@@ -226,6 +248,22 @@
       const data = await res.json();
       alert(`Đã hoàn tất đồng bộ ${data.count.toLocaleString()} domain vào Deno KV!`);
       loadData();
+    }
+
+    async function testQuery() {
+      const domain = prompt("Nhập domain để thử nghiệm phân giải qua DoH:", "example.com");
+      if (!domain) return;
+      try {
+        const res = await fetch(`/dns-query?name=${encodeURIComponent(domain.trim())}`);
+        if (res.ok) {
+          alert(`Truy vấn DoH cho "${domain}" thành công! Kết quả đã được cập nhật lên Dashboard.`);
+          loadData();
+        } else {
+          alert(`Lỗi khi truy vấn DoH: HTTP ${res.status}`);
+        }
+      } catch (err) {
+        alert(`Lỗi kết nối DoH: ${err.message}`);
+      }
     }
 
     loadData();
