@@ -1,37 +1,36 @@
-# 🤝 Hướng dẫn đóng góp (CONTRIBUTING)
+# 🤝 Contributing (CONTRIBUTING)
 
-Dự án **deno-dns** — server DNS-over-HTTPS trên Deno + Deno KV. Tài liệu và
-comment trong code dùng **tiếng Việt** (không bắt buộc dấu) — vui lòng giữ
-nguyên ngôn ngữ này khi đóng góp, trừ identifier/code tiếng Anh.
+The **deno-dns** project — a DNS-over-HTTPS server on Deno + Deno KV. Documentation
+and code comments use **English** (without required diacritics) — please maintain
+this language when contributing, except for identifier/code in English.
 
-## 1. Yêu cầu
+## 1. Requirements
 
-- **Deno 2.9.7** (xem `deno.json`; cờ `"unstable": ["kv"]` là bắt buộc trên
-  2.9.x vì `Deno.openKv` còn `@experimental`)
-- Không cần build step, không cần DB ngoài
+- **Deno 2.9.7** (see `deno.json`; flag `"unstable": ["kv"]` is required on
+  2.9.x because `Deno.openKv` is `@experimental`)
 
 ```bash
-export PATH=/home/codespace/.deno/bin:$PATH   # nếu deno không có trong PATH
-deno --version                                 # phải là 2.9.7
+export PATH=/home/codespace/.deno/bin:$PATH   # if deno not in PATH
+deno --version     # must be 2.9.7
 ```
 
-## 2. Chạy local
+## 2. Run locally
 
 ```bash
-deno task start   # chạy server (http://localhost:8000)
+deno task start   # run server (http://localhost:8000)
 deno task dev     # watch mode
 ```
 
-## 3. Cổng kiểm tra (bắt buộc xanh trước khi PR)
+## 3. Required checks (mandatory before PR)
 
 ```bash
 deno task check   # type-check main.ts + src/**/*.ts
 deno task lint    # deno lint
-deno task fmt --check   # format (chạy `deno fmt` để tự sửa)
-deno test         # toàn bộ test — phải 47/47 pass
+deno task fmt --check   # format (run `deno fmt` to auto-fix)
+deno test         # entire test — must be 47/47 pass
 ```
 
-Cổng đầy đủ (mô phỏng CI):
+Full CI simulation:
 
 ```bash
 deno task check && deno task lint && deno task fmt --check && deno test
@@ -40,74 +39,73 @@ deno task check && deno task lint && deno task fmt --check && deno test
 ### Script validation
 
 ```bash
-deno task migrate-kv       # xoa khoa legacy ["blocked_domains", ...] (manual, plan §7)
+deno task migrate-kv       # remove legacy ["blocked_domains", ...] keys (manual, plan §7)
 deno task bench-hot-path   # benchmark policy lookup — p50 < 20ms (plan §10)
 ```
 
-- `migrate-kv` chỉ DELETE `blocked_domains/*`; dùng `DENO_KV_PATH=<path>` để trỏ
-  vào KV cần migrate (không đụng KV thật nếu chưa chắc chắn).
-- `bench-hot-path` chạy hoàn toàn in-memory (0 KV op) — exit 1 nếu p50 ≥ 20ms.
+- `migrate-kv` only DELETE `blocked_domains/*`; use `DENO_KV_PATH=<path>` to point
+  to the KV you want to migrate (do not touch real KV if uncertain).
+- `bench-hot-path` runs entirely in-memory (0 KV ops) — exit 1 if p50 ≥ 20ms.
 
-## 4. Quy ước code
+## 4. Code conventions
 
-- **File**: `kebab-case.ts`; test đặt cạnh nguồn: `src/foo.ts` →
-  `src/foo_test.ts` (tên `module_name_test.ts`)
-- **Export**: `PascalCase` cho class (`BlocklistStore`, `QueryCounters`),
-  `camelCase` cho hàm; hằng số `SCREAMING_SNAKE_CASE`
-- **KV key**: chỉ khai báo trong `src/kv/schema.ts` (`MANIFEST_KEY`,
-  `chunkKey()`, `STATS_KEYS`, ...) — **không** đặt tên key rải rác trong module
-  khác
-- **Interface chia sẻ** (dùng ≥ 2 module): `src/types/index.ts`
-- **Hot path DNS**: mọi policy check
-  (`isWhitelisted`/`getRewriteIP`/`isBlocked`) phải là tra cứu in-memory — **0
-  Deno KV operation**; không thêm `await kv.*` vào đường query
-- Comment tài liệu: tiếng Việt
+- **File**: `kebab-case.ts`; test placed alongside source: `src/foo.ts` →
+  `src/foo_test.ts` (module `module_name_test.ts`)
+- **Export**: `PascalCase` for class (`BlocklistStore`, `QueryCounters`),
+  `camelCase` for functions; constant `SCREAMING_SNAKE_CASE`
+- **KV key**: only declare in `src/kv/schema.ts` (`MANIFEST_KEY`,
+  `chunkKey()`, `STATS_KEYS`, ...) — **do not** scatter key names in other modules
+- **Shared interface** (used by ≥ 2 modules): `src/types/index.ts`
+- **Hot path DNS**: every policy check
+  (`isWhitelisted`/`getRewriteIP`/`isBlocked`) must be in-memory lookup — **0
+  Deno KV operation**; do not add `await kv.*` in the query path
+- Documentation comments: English
 
-## 5. Cấu trúc src/
+## 5. src/ structure
 
 ```
 src/
-├── types/       # interface chia sẻ (ClientInfo, QueryStatus, BlocklistManifest…)
-├── kv/          # tay cầm Deno KV (index) + schema (khoa) + migration
-├── blocklist/   # store (in-memory) + snapshot (MVCC chunks/manifest) + suffix
-├── counters/    # counter (flush atomic) + logring (ring buffer 50) + constants
-├── clientip/    # trust IP nen tang (platform header) + constants
-├── ratelimit/   # LruMap + TokenBucket (DoH/API/login/sync) + constants
-├── ssrf/        # guard https-only + block IP noi bo + constants
-├── upstream/    # catalog (data + cache) + selector (region fallback)
-├── auth/        # PBKDF2 + session
-├── dns/         # pipeline (route) + policies (CORS/forward)
-├── api/         # handler /api/* + validators
-├── diag/        # /api/diag/headers, /api/stats
-├── bench/       # bench-hot-path
-└── storage.ts   # facade + sync (initStorage, syncBlocklists, getStats…)
+├ types/       # shared interfaces (ClientInfo, QueryStatus, BlocklistManifest...)
+├ kv/          # Deno KV hand + schema (keys)
+├ blocklist/   # store (in-memory) + snapshot (MVCC chunks/manifest) + suffix
+├ counters/    # counter (atomic flush) + logring (ring buffer 50) + constants
+├ clientip/    # trust IP ening (platform header) + constants
+├ ratelimit/   # LruMap + TokenBucket (DoH/API/login/sync) + constants
+├ ssrf/        # guard https-only + block IP in-code + constants
+├ upstream/    # catalog (data + cache) + selector (region fallback)
+├ auth/        # PBKDF2 + session
+├ dns/         # pipeline (route) + policies (CORS/forward)
+├ api/         # handler /api/* + validators
+├ diag/        # /api/diag/headers, /api/stats
+├ bench/       # bench-hot-path
+└ storage.ts   # facade + sync (initStorage, syncBlocklists, getStats…)
 ```
 
 ## 6. Git & PR
 
-- **Commit message** kiểu Conventional Commits (xem lịch sử git):
+- **Commit message** Conventional Commits style (see git history):
   `feat(scope): ...`, `fix(scope): ...`, `test(scope): ...`, `docs(scope): ...`,
   `refactor(scope): ...`, `chore(scope): ...`
-- Mỗi PR phải giữ xanh: `check + lint + fmt + test` (CI chạy tự động
+- Each PR must pass: `check + lint + fmt + test` (CI runs automatically
   `.github/workflows/deno.yml`)
-- Mỗi PR nhận **comment sticky `🚀 Preview`** (job `preview`, plan §6.2): trạng
-  thái build Deno Deploy (commit status `deploy/<owner>/<repo>`) + link console.
-  PR sửa `docs/`, `README.md` hoặc `CHANGELOG.md` được upload artifact
-  `docs-preview-pr-<số>` (giữ 14 ngày, tải từ workflow run)
-- **Preview URL trực tiếp (tùy chọn)**: thêm secret `DENO_DEPLOY_TOKEN` (token
-  Deno Deploy) tại Settings → Secrets and variables → Actions → job sẽ gọi
-  `https://api.deno.com/v1/projects/<project>/deployments` và in
-  `https://<domain>.deno.dev` vào comment. Không có token → job vẫn xanh,
-  comment chỉ thiếu dòng URL. Project mặc định `deno-dns`; đổi bằng repository
+- Each PR receives **sticky `🚀 Preview`** comment (job `preview`, plan §6.2):
+  deployment status + file changes + artifact.
+- **Preview URL directly (optional)**: add secret `DENO_DEPLOY_TOKEN` (Deno Deploy
+  token) at Settings → Secrets and variables → Actions; the job will call
+  `https://api.deno.com/v1/projects/<project>/deployments` and output
+  `https://<domain>.deno.dev` in the comment. Without token — job stays green,
+  comment only missing line. Default project `deno-dns`; change via repository
   variable `DENO_DEPLOY_PROJECT`
-- **Pages là điều kiện một lần** cho job `docs`: bật Settings → Pages → Source =
-  _GitHub Actions_ (chưa bật thì `deploy-pages` fail với lỗi 404)
-- Test mới: bọc IO/timer trong `try/finally` (dispose, restore fetch stub…); mỗi
-  test tự reset singleton qua `resetKv()`/`resetCounters()` nếu cần
-- Không commit file môi trường (`.env`) hay dữ liệu KV
+- **Pages is a one-time condition** for `docs` job: enable Settings → Pages →
+  Source = _GitHub Actions_ (if not enabled then `deploy-pages` fails with 404 error)
+- New tests: wrap IO/timer in `try/finally` (dispose, restore fetch stub…); each
+  test reset singleton via `resetKv()`/`resetCounters()` if needed
+- Do not commit environment files (`.env`) or KV data
+- Test new: wrap IO/timer in `try/finally` (dispose, restore fetch stub…); each
+  test reset singleton via `resetKv()`/`resetCounters()` if needed
 
-## 7. Bằng chứng/ADR
+## 7. Evidence/ADR
 
-Quyết định kiến trúc ghi trong `docs/ARCHITECTURE.md` §8 (ADR-1…ADR-7); mô hình
-dữ liệu KV §7; mô hình mối đe dọa §9. Thay đổi ảnh hưởng kiến trúc cần cập nhật
-tài liệu tương ứng trong cùng PR.
+Architectural decisions recorded in `docs/ARCHITECTURE.md` §8 (ADR-1…ADR-7);
+data model §7; threat model §9. Changes affecting architecture must update the
+corresponding documentation in the same PR.

@@ -1,0 +1,48 @@
+# CI/CD cho deno-dns (plan §6.3 - GitHub Pages deployment).
+
+name: deno-dns CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  DENO_VERSION: "2.9.7"
+
+jobs:
+  docs:
+    name: Publish Architecture Docs
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Stage docs site (Markdown — khong can render)
+        run: |
+          mkdir -p _site
+          cp docs/*.md README.md CHANGELOG.md _site/
+          cp README.md _site/index.html
+          touch _site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

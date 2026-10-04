@@ -1,0 +1,36 @@
+# CI/CD cho deno-dns (plan §6.2 - Security Scan).
+
+name: deno-dns CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  security-scan:
+    name: Dependency Security Scan
+    needs: deno-lint.yml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Cache Deno artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/deno
+          key: deno-${{ runner.os }}-${{ hashFiles('deno.lock') }}
+
+      - name: Audit dependencies (OSV — deno audit)
+        run: deno audit --ignore-registry-errors
